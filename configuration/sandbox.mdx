@@ -1,5 +1,5 @@
 ---
-title: "Configure DeerFlow Sandbox Providers"
+title: "Configure DeerFlow Code Execution Sandbox Providers"
 sidebarTitle: "Sandbox"
 description: "Set up DeerFlow's code execution sandbox. Choose from Local, Docker (AioSandbox), BoxLite micro-VM, E2B Cloud, or Kubernetes Provisioner providers."
 ---
@@ -71,7 +71,7 @@ BoxLite runs each sandbox in a daemonless OCI micro-VM. It provides strong isola
 **Install the optional runtime first:**
 
 ```shell
-uv pip install 'deerflow-harness[boxlite]'
+pip install "deerflow-harness[boxlite]"
 ```
 
 **Configure the provider:**
@@ -84,6 +84,8 @@ sandbox:
   cpus: 2             # optional per-VM vCPU count
   replicas: 3         # max active + warm VMs per gateway process
   idle_timeout: 600   # seconds before an idle warm VM is stopped; 0 disables reaping
+  environment:
+    PYTHONUNBUFFERED: "1"
 ```
 
 BoxLite boxes are scoped to `(user_id, thread_id)` and released into a warm pool after each turn. The same user and thread can reclaim their warm VM on the next request; different threads cannot share a VM. The `replicas` cap applies to the sum of active and warm VMs.

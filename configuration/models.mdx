@@ -1,7 +1,7 @@
 ---
-title: "Configure LLM Models in DeerFlow"
+title: "Configure LLM Providers and Models in DeerFlow config.yaml"
 sidebarTitle: "Models"
-description: "Add and configure language model providers in DeerFlow's config.yaml. Covers OpenAI, Anthropic, DeepSeek, Claude Code, Codex CLI, and OpenAI-compatible gateways."
+description: "Configure language model providers in DeerFlow config.yaml. Covers OpenAI, Anthropic, DeepSeek, Claude Code, Codex CLI, and OpenAI-compatible gateways."
 ---
 
 DeerFlow is model-agnostic: any LLM that exposes an OpenAI-compatible API or has a LangChain integration can be wired in through the `models` section of `config.yaml`. You can register multiple models simultaneously and select which one to use per conversation or per sub-agent role.
@@ -120,8 +120,8 @@ models:
 
 **Authentication behavior for CLI-backed providers:**
 
-- `ClaudeChatModel` reads credentials from the `CLAUDE_CODE_OAUTH_TOKEN` environment variable, then `ANTHROPIC_AUTH_TOKEN`, then `CLAUDE_CODE_CREDENTIALS_PATH` (a single `.credentials.json` file path), and finally `~/.claude/.credentials.json` as a plaintext fallback.
-- `CodexChatModel` loads Codex CLI auth from `~/.codex/auth.json`. You can override the path with the `CODEX_AUTH_PATH` environment variable.
+- `ClaudeChatModel` reads credentials from `CLAUDE_CODE_OAUTH_TOKEN`, then `ANTHROPIC_AUTH_TOKEN`, then `CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR` (a file descriptor), then `CLAUDE_CODE_CREDENTIALS_PATH` (a single `.credentials.json` file path), and finally `~/.claude/.credentials.json` as a plaintext fallback. The gateway checks environment variables before credential files, so token-based paths require no file mount.
+- `CodexChatModel` loads Codex CLI auth from `~/.codex/auth.json`. You can override the path with the `CODEX_AUTH_PATH` environment variable. The Codex Responses endpoint rejects `max_tokens` and `max_output_tokens`, so `CodexChatModel` does not expose a request-level token cap — omit `max_tokens` for Codex entries.
 - On macOS, DeerFlow does not probe the system Keychain automatically. Export Claude Code auth explicitly when needed:
 
   ```shell

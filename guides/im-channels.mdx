@@ -1,5 +1,5 @@
 ---
-title: "Connect IM Channels to DeerFlow"
+title: "Connect Messaging Apps to DeerFlow via IM Channels"
 sidebarTitle: "IM Channels"
 description: "Connect Telegram, Slack, Discord, Feishu, DingTalk, WeCom, WeChat, and Buzz messaging apps to DeerFlow. No public IP or webhook URL required."
 ---
@@ -59,14 +59,46 @@ channels:
     enabled: true
     client_id: $DINGTALK_CLIENT_ID
     client_secret: $DINGTALK_CLIENT_SECRET
+  wechat:
+    enabled: true
+    bot_token: $WECHAT_BOT_TOKEN
   wecom:
     enabled: true
     bot_id: $WECOM_BOT_ID
     bot_secret: $WECOM_BOT_SECRET
+  buzz:
+    enabled: true
+    relay_url: wss://buzz.example.com
+    private_key: $BUZZ_PRIVATE_KEY   # hex or nsec1…
 
 channel_connections:
   enabled: true
   require_bound_identity: true
+
+  telegram:
+    enabled: true
+    bot_username: $TELEGRAM_BOT_USERNAME
+
+  slack:
+    enabled: true
+
+  discord:
+    enabled: true
+
+  feishu:
+    enabled: true
+
+  dingtalk:
+    enabled: true
+
+  wechat:
+    enabled: true
+
+  wecom:
+    enabled: true
+
+  buzz:
+    enabled: true
 ```
 
 <Warning>
@@ -104,7 +136,7 @@ Each DeerFlow user must complete a one-time identity bind before sending message
   <Accordion title="Slack">
     Find the DeerFlow Slack bot in your workspace and send it the message:
 
-    ```
+    ```text
     /connect <code>
     ```
 
@@ -113,7 +145,7 @@ Each DeerFlow user must complete a one-time identity bind before sending message
   <Accordion title="Discord">
     Open a DM with the DeerFlow Discord bot and send:
 
-    ```
+    ```text
     /connect <code>
     ```
 
@@ -122,7 +154,7 @@ Each DeerFlow user must complete a one-time identity bind before sending message
   <Accordion title="Feishu / Lark">
     Open a direct message with the DeerFlow Feishu bot and send:
 
-    ```
+    ```text
     /connect <code>
     ```
 
@@ -131,20 +163,29 @@ Each DeerFlow user must complete a one-time identity bind before sending message
   <Accordion title="DingTalk">
     Open a direct message with the DeerFlow DingTalk bot and send:
 
-    ```
+    ```text
     /connect <code>
     ```
 
     The polling worker receives the message and binds your DingTalk user identity to your DeerFlow account.
   </Accordion>
-  <Accordion title="WeCom / WeChat">
-    Open a conversation with the DeerFlow WeCom or WeChat bot and send:
+  <Accordion title="WeCom">
+    Open a conversation with the DeerFlow WeCom bot and send:
 
-    ```
+    ```text
     /connect <code>
     ```
 
-    The long-connection or polling worker binds your platform identity to your DeerFlow account.
+    The long-connection worker binds your WeCom identity to your DeerFlow account.
+  </Accordion>
+  <Accordion title="WeChat">
+    Open a conversation with the DeerFlow WeChat bot and send:
+
+    ```text
+    /connect <code>
+    ```
+
+    The polling worker binds your WeChat identity to your DeerFlow account.
   </Accordion>
   <Accordion title="Buzz (Nostr)">
     Send `/connect <code>` as a direct message or @-mention to the DeerFlow Buzz bot on your relay. The relay-loop worker receives the message and binds your Nostr pubkey (scoped to the relay host) to your DeerFlow account.

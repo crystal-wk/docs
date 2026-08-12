@@ -8,12 +8,12 @@ Context modes control how much reasoning and delegation DeerFlow applies to a re
 
 ## Modes at a Glance
 
-| Mode | Thinking | Planning | Sub-Agents | Best For |
+| Mode | `thinking_enabled` | `is_plan_mode` | `subagent_enabled` | Best For |
 |---|---|---|---|---|
-| **Flash** | Off | Off | Off | Quick questions, simple lookups |
-| **Standard** | On | Off | Off | General tasks needing reasoning |
-| **Pro** | On | On | Off | Research tasks with structured planning |
-| **Ultra** | On | On | On | Complex multi-step research and delegation |
+| **Flash** | `false` | `false` | `false` | Quick questions, simple lookups |
+| **Standard** | `true` | `false` | `false` | General tasks needing reasoning |
+| **Pro** | `true` | `true` | `false` | Research tasks with structured planning |
+| **Ultra** | `true` | `true` | `true` | Complex multi-step research and delegation |
 
 ## How to Set the Mode
 
@@ -46,22 +46,22 @@ Context modes control how much reasoning and delegation DeerFlow applies to a re
     ```
   </Tab>
   <Tab title="REST API">
-    Pass the flags in the `config.configurable` object of a streaming run request:
+    Pass the flags in the top-level `context` object of a streaming run request:
 
     ```shell
     curl -N -X POST http://localhost:2026/api/langgraph/threads/{thread_id}/runs/stream \
       -H "Content-Type: application/json" \
       -d '{
-        "assistant_id": "agent",
+        "assistant_id": "lead_agent",
         "input": {
-          "messages": [{"role": "human", "content": "Research quantum computing trends"}]
+          "messages": [{"type": "human", "content": [{"type": "text", "text": "Research quantum computing trends"}]}]
         },
-        "config": {
-          "configurable": {
-            "thinking_enabled": true,
-            "is_plan_mode": true,
-            "subagent_enabled": true
-          }
+        "stream_mode": ["values", "messages-tuple"],
+        "context": {
+          "thinking_enabled": true,
+          "is_plan_mode": true,
+          "subagent_enabled": true,
+          "thread_id": "{thread_id}"
         }
       }'
     ```

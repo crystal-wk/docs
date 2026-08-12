@@ -1,7 +1,7 @@
 ---
-title: "Configure Tools and Tool Groups in DeerFlow"
+title: "Configure Built-In Tools and Search Providers in DeerFlow"
 sidebarTitle: "Tools"
-description: "Enable and configure built-in tools and web search engines in DeerFlow. Set up tool groups, Tavily search, Browserless screenshot capture, and custom tools."
+description: "Enable and configure built-in tools and web search in DeerFlow config.yaml. Set up tool groups, Tavily, Brave, Browserless, and custom search providers."
 ---
 
 DeerFlow ships with a set of built-in tools that give the agent the ability to search the web, read and write files, capture screenshots, and execute shell commands. You control which tools are available by defining them in `config.yaml` and organizing them into tool groups. You can also manage tools interactively from **Settings → Tools** in the web UI.
@@ -52,14 +52,15 @@ tools:
 | Provider | `use` value | Key variable |
 |---|---|---|
 | **Tavily** (recommended) | `deerflow.community.tavily.tools:web_search_tool` | `TAVILY_API_KEY` |
-| Jina AI | `deerflow.community.jina.tools:web_search_tool` | `JINA_API_KEY` |
+| Brave Search | `deerflow.community.brave.tools:web_search_tool` | `BRAVE_SEARCH_API_KEY` |
 | DuckDuckGo | `deerflow.community.duckduckgo.tools:web_search_tool` | *(none required)* |
-| Crawl4AI | `deerflow.community.crawl4ai.tools:web_search_tool` | *(none required)* |
+| Exa | `deerflow.community.exa.tools:web_search_tool` | `EXA_API_KEY` |
+| InfoQuest | `deerflow.community.infoquest.tools:web_search_tool` | *(contact provider)* |
 | Firecrawl | `deerflow.community.firecrawl.tools:web_search_tool` | `FIRECRAWL_API_KEY` |
 | fastCRW | `deerflow.community.fastcrw.tools:web_search_tool` | *(contact provider)* |
 | GroundRoute | `deerflow.community.groundroute.tools:web_search_tool` | `GROUNDROUTE_API_KEY` |
 
-Tavily is recommended for production use because of its high-quality snippets and reliable rate limits. DuckDuckGo and Crawl4AI require no API key and are useful for local development or low-volume use.
+Tavily is recommended for production use because of its high-quality snippets and reliable rate limits. DuckDuckGo requires no API key and is useful for local development or low-volume use. GroundRoute is a meta-search gateway that routes across Serper, Brave, Exa, Tavily, Firecrawl, and Perplexity with gain-share pricing.
 
 </Accordion>
 
@@ -113,9 +114,9 @@ curl -sS "http://localhost:3032/screenshot?token=local-dev-token" \
   By default, `web_capture` refuses URLs that resolve to private, loopback, link-local, or cloud-metadata addresses. Set `allow_private_addresses: true` only when you intentionally point the tool at an internal target.
 </Note>
 
-## Brave Image Search
+## Image Search Configuration
 
-The `image_search` tool can use the Brave Search API to find reference images. Set up your API key and configure the tool:
+The `image_search` tool searches for reference images. It supports multiple providers — Brave Search, DuckDuckGo (no key required), InfoQuest, and Serper. Configure the provider in the `tools` section:
 
 ```yaml
 tools:
@@ -125,7 +126,7 @@ tools:
     # api_key: $BRAVE_SEARCH_API_KEY
 ```
 
-Export your Brave Search API key:
+Export your Brave Search API key when using the Brave provider:
 
 ```shell
 export BRAVE_SEARCH_API_KEY=your-brave-search-api-key

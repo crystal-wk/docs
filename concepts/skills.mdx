@@ -1,5 +1,5 @@
 ---
-title: "DeerFlow Skills: Extensible Agent Capabilities"
+title: "DeerFlow Skills: Domain-Specific Agent Capabilities"
 sidebarTitle: "Skills"
 description: "Skills extend DeerFlow agents with domain-specific workflows. Learn how to use public skills, create custom skills, and control skill access."
 ---
@@ -14,7 +14,7 @@ Skills are **not** standalone agents — they are capability overlays applied to
 
 ### Skills Directory Structure
 
-```
+```text
 deer-flow/
 └── skills/
     ├── public/       # Built-in skills, committed to the repo
@@ -29,13 +29,13 @@ DeerFlow recursively discovers all `SKILL.md` files under `skills/public/` and `
 
 Once a skill is enabled, you activate it in conversation with a slash command:
 
-```
+```text
 /<skill-name> <your task>
 ```
 
 For example, to use a skill named `github-research`:
 
-```
+```text
 /github-research summarize the top open issues in langchain-ai/langgraph
 ```
 
@@ -73,7 +73,7 @@ DeerFlow ships with a `claude-to-deerflow` skill in `skills/public/`. This skill
   <Step title="Create the skill directory">
     Add a new directory under `skills/custom/`. The directory name becomes the skill's identifier.
 
-    ```
+    ```text
     skills/
     └── custom/
         └── my-data-analysis/
@@ -97,7 +97,7 @@ DeerFlow ships with a `claude-to-deerflow` skill in `skills/public/`. This skill
   <Step title="Activate in conversation">
     Use the slash command to invoke it:
 
-    ```
+    ```text
     /my-data-analysis analyze the attached CSV and produce a summary report
     ```
   </Step>

@@ -1,10 +1,10 @@
 ---
-title: "DeerFlow REST API Reference"
+title: "DeerFlow REST API Reference: Endpoints and Examples"
 sidebarTitle: "REST API"
-description: "HTTP API endpoints for DeerFlow's Gateway. Covers models, skills, agents, memory, threads, uploads, artifacts, MCP config, and streaming runs."
+description: "HTTP API endpoints for DeerFlow. Covers models, skills, agents, memory, threads, uploads, artifacts, MCP config, and streaming runs."
 ---
 
-DeerFlow exposes a REST API through its Gateway (port 8001), proxied through Nginx at port 2026. All API paths below use the base URL `http://localhost:2026`. The LangGraph-compatible endpoints live under `/api/langgraph/`, and all other resource endpoints live under `/api/`.
+DeerFlow exposes a REST API through its Gateway, proxied via Nginx at `http://localhost:2026`. All API paths below use that base URL. The LangGraph-compatible endpoints live under `/api/langgraph/`, and all other resource endpoints live under `/api/`.
 
 <Note>
   In the default local setup there is no authentication. For production deployments, place an auth gateway in front of Nginx before exposing any port to the internet.
@@ -99,25 +99,27 @@ The response includes a `thread_id` UUID. Use this value in subsequent requests.
 
 ### Stream a Run
 
-Send a message to a thread and stream the agent's response as Server-Sent Events (SSE).
+Send a message to a thread and stream the agent's response as Server-Sent Events (SSE). Pass context mode flags in the top-level `context` object to control how much reasoning and delegation the agent applies.
 
 ```shell
 curl -N -X POST http://localhost:2026/api/langgraph/threads/{thread_id}/runs/stream \
   -H "Content-Type: application/json" \
   -d '{
-    "assistant_id": "agent",
+    "assistant_id": "lead_agent",
     "input": {
-      "messages": [{"role": "human", "content": "Hello!"}]
+      "messages": [{"type": "human", "content": [{"type": "text", "text": "Hello!"}]}]
     },
-    "config": {
-      "configurable": {
-        "is_plan_mode": false,
-        "thinking_enabled": true,
-        "subagent_enabled": false
-      }
+    "stream_mode": ["values", "messages-tuple"],
+    "context": {
+      "thinking_enabled": false,
+      "is_plan_mode": false,
+      "subagent_enabled": false,
+      "thread_id": "{thread_id}"
     }
   }'
 ```
+
+See [Context Modes](/reference/context-modes) for the full list of flag combinations.
 
 ### Get Thread History
 
@@ -130,6 +132,8 @@ curl http://localhost:2026/api/langgraph/threads/{thread_id}/history
 ```
 
 ### Delete a Thread
+
+Removes DeerFlow-managed local thread data. Delete the LangGraph thread via `/api/langgraph/threads/{thread_id}` before calling this endpoint.
 
 ```
 DELETE /api/threads/{thread_id}

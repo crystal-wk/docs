@@ -1,5 +1,5 @@
 ---
-title: "Agents in DeerFlow: Lead Agent and Sub-Agents"
+title: "DeerFlow Agents: Orchestration and Sub-Agent Delegation"
 sidebarTitle: "Agents"
 description: "Learn how DeerFlow's lead agent orchestrates sub-agents, delegates tasks, and handles multi-step workflows with delegation caps and parallel execution."
 ---
@@ -39,7 +39,7 @@ DeerFlow enforces limits to keep costs and resource use predictable:
 - **Max 3 sub-agents per turn** — the Lead Agent can run up to three sub-agents in parallel during a single response.
 - **15-minute timeout** — each sub-agent run is capped at 15 minutes.
 - **Delegation ledger** — the Lead Agent tracks every delegation it makes during a run.
-- **Total delegation cap per run** — a configurable `subagents.max_total_per_run` setting in `config.yaml` limits how many sub-agent delegations can occur across the entire run, preventing runaway chains.
+- **Total delegation cap per run** — a configurable limit in `config.yaml` under the `subagents` section controls how many sub-agent delegations can occur across the entire run, preventing runaway chains.
 
 Sub-agents execute in background thread pools with live status tracking. Their progress appears as task cards in the chat UI via SSE events.
 

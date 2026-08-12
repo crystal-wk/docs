@@ -1,7 +1,7 @@
 ---
-title: "DeerFlow Environment Variables Reference"
+title: "DeerFlow Environment Variables: Complete Reference Guide"
 sidebarTitle: "Environment Variables"
-description: "Complete reference for DeerFlow environment variables including API keys for LLM providers, search tools, sandbox credentials, and runtime configuration."
+description: "Complete reference for DeerFlow environment variables: API keys for LLM providers, search tools, sandbox credentials, and runtime configuration."
 ---
 
 Environment variables let you supply secrets and runtime settings to DeerFlow without storing them directly in `config.yaml`. Keeping sensitive values out of your configuration file makes it safer to share configs, check templates into version control, and rotate credentials without editing YAML.
@@ -38,10 +38,14 @@ DeerFlow substitutes variables at config-load time. If a referenced variable is 
 | `OPENAI_API_KEY` | OpenAI |
 | `ANTHROPIC_API_KEY` | Anthropic |
 | `DEEPSEEK_API_KEY` | DeepSeek |
+| `NOVITA_API_KEY` | Novita (OpenAI-compatible gateway) |
+| `MINIMAX_API_KEY` | MiniMax (OpenAI-compatible gateway) |
 | `MIMO_API_KEY` | Xiaomi MiMo |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth (preferred over file-based auth) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token (preferred over file-based auth) |
 | `ANTHROPIC_AUTH_TOKEN` | Anthropic alternative auth token |
-| `CODEX_AUTH_PATH` | Path to a Codex CLI `auth.json` file |
+| `CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR` | File descriptor carrying the Claude Code OAuth token |
+| `CLAUDE_CODE_CREDENTIALS_PATH` | Path to a single Claude Code `.credentials.json` file |
+| `CODEX_AUTH_PATH` | Path to a Codex CLI `auth.json` file (default: `~/.codex/auth.json`) |
 
 ## Search & Web Tools
 
@@ -98,7 +102,7 @@ DeerFlow substitutes variables at config-load time. If a referenced variable is 
   </Tab>
 </Tabs>
 
-## Runtime Paths
+## Runtime Configuration
 
 | Variable | Purpose |
 |---|---|
@@ -107,6 +111,7 @@ DeerFlow substitutes variables at config-load time. If a referenced variable is 
 | `DEER_FLOW_HOME` | Runtime state directory (defaults to `.deer-flow` under the project root) |
 | `DEER_FLOW_PROJECT_ROOT` | Project root directory for resolving relative runtime paths |
 | `DEER_FLOW_SKILLS_PATH` | Skills directory path (overrides `skills.path` in `config.yaml`) |
+| `GATEWAY_ENABLE_DOCS` | Set to `false` to disable the Swagger UI (`/docs`), ReDoc (`/redoc`), and OpenAPI schema (`/openapi.json`) endpoints (default: `true`) |
 
 ## Example `.env` File
 

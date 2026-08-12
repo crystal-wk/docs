@@ -195,7 +195,7 @@ make config-upgrade
 cp extensions_config.example.json extensions_config.json
 ```
 
-Both files are live-reloaded by the backend on config access, so most changes take effect without a restart. The exceptions are `database.checkpoint_channel_mode` and `database.checkpoint_delta.snapshot_frequency`, which are frozen when the process first builds an agent and require a process restart to change safely.
+Both files are live-reloaded by the backend on config access, so most changes take effect without a restart. The exception is checkpoint storage settings under the `database` section — those are applied once when the agent runtime first starts and require a process restart to change safely.
 
 ## One-Line Agent Setup
 

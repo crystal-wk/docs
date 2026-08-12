@@ -1,5 +1,5 @@
 ---
-title: "Connect MCP Servers to DeerFlow"
+title: "Connect MCP Servers to DeerFlow for Tool Discovery"
 sidebarTitle: "MCP Servers"
 description: "Integrate Model Context Protocol servers with DeerFlow to give agents access to databases, APIs, and custom tools through a unified configuration."
 ---
@@ -192,7 +192,7 @@ Use routing hints to guide agents toward a specific MCP server for matching requ
       "routing": {
         "mode": "prefer",
         "priority": 50,
-        "keywords": ["orders", "users", "SQL", "database"]
+        "keywords": ["orders", "users", "SQL", "database", "table"]
       }
     }
   }
@@ -253,6 +253,39 @@ You can enable, disable, and inspect MCP servers without editing `extensions_con
   Do **not** add an MCP filesystem server that points at the DeerFlow workspace. DeerFlow provides built-in file tools for thread-scoped workspace access. Overlapping file tools use different path semantics, which can make LLM tool selection and file access behavior unstable.
 
   Use DeerFlow's built-in file tools for all DeerFlow workspace files.
+</Warning>
+
+## Custom Tool Interceptors
+
+You can register custom interceptors that run before every MCP tool call. This is useful for injecting per-request headers (such as user auth tokens), logging, or metrics collection.
+
+Declare interceptors in `extensions_config.json` using the `mcpInterceptors` field:
+
+```json
+{
+  "mcpInterceptors": [
+    "my_package.mcp.auth:build_auth_interceptor"
+  ],
+  "mcpServers": {}
+}
+```
+
+Each entry is a Python import path in `module:variable` format. The variable must be a no-argument builder function that returns an async interceptor, or `None` to skip. A single string value is normalized to a one-element list. Invalid paths or builder failures are logged as warnings without blocking other interceptors.
+
+To supply a per-request credential to an interceptor, pass it through `config.context.secrets` on each run request:
+
+```json
+{
+  "config": {
+    "context": {
+      "secrets": {"MCP_AUTH_TOKEN": "<request-scoped credential>"}
+    }
+  }
+}
+```
+
+<Warning>
+  Do not put credentials in `metadata.auth_token` or `config.metadata.auth_token` — these paths are rejected at run admission with HTTP 422. Use `config.context.secrets` instead, whose values are available to interceptors but are stripped from persisted and API-visible run configuration copies.
 </Warning>
 
 ## Learn More

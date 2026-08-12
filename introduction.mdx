@@ -19,28 +19,28 @@ Visit the official website at [https://deerflow.tech](https://deerflow.tech) to 
 ## Key Features
 
 <CardGroup cols={2}>
-  <Card title="Multi-Agent Orchestration" icon="network-wired">
+  <Card title="Multi-Agent Orchestration" icon="network-wired" href="/concepts/agents">
     The lead agent delegates tasks to specialist sub-agents on demand, supporting parallel execution, scoped context isolation, and structured result synthesis. A built-in delegation ledger prevents redundant re-delegation, and a total fan-out cap keeps resource usage predictable.
   </Card>
-  <Card title="Sandboxed Code Execution" icon="box">
-    Run agent-generated code safely in one of five supported sandbox backends: **Docker** (AIO), **E2B** micro-VMs, **BoxLite**, **Kubernetes** pods via the provisioner service, or **Local** host execution. Switch backends with a single `config.yaml` change.
+  <Card title="Sandboxed Code Execution" icon="box" href="/concepts/sandbox">
+    Run agent-generated code safely in one of five supported sandbox backends: **Docker** (AIO), **E2B** micro-VMs, **BoxLite**, **Kubernetes** pods via a provisioner service, or **Local** host execution. Switch backends with a single `config.yaml` change.
   </Card>
-  <Card title="Extensible Skills System" icon="puzzle-piece">
+  <Card title="Extensible Skills System" icon="puzzle-piece" href="/concepts/skills">
     Skills are `SKILL.md` packages that bundle workflow instructions, tool policies, and supporting resources. Users can install per-user custom skills, activate them with a slash command (`/skill-name`), and share them as `.skill` archives. Skills are loaded progressively to keep context windows lean.
   </Card>
-  <Card title="Long-Term Memory" icon="brain">
-    DeerFlow persists user context and per-agent facts across sessions. Two pluggable backends ship out of the box: **DeerMem** (self-contained, file-backed with SQLite FTS5 retrieval) and **mem0** (cloud-native). Memory is consolidated automatically and stale facts are pruned by the LLM on a configurable schedule.
+  <Card title="Long-Term Memory" icon="brain" href="/concepts/memory">
+    DeerFlow persists user context and per-agent facts across sessions. Two pluggable backends ship out of the box: **DeerMem** (self-contained, file-backed with full-text search) and **mem0** (cloud-native). Memory is consolidated automatically and stale facts are pruned by the LLM on a configurable schedule.
   </Card>
-  <Card title="MCP Server Integration" icon="plug">
+  <Card title="MCP Server Integration" icon="plug" href="/guides/mcp-server">
     Connect any Model Context Protocol server — stdio or HTTP/SSE — to extend the agent's toolset. OAuth token flows (`client_credentials`, `refresh_token`) are supported for HTTP/SSE servers, and per-server `tool_call_timeout` prevents slow tools from blocking a run.
   </Card>
-  <Card title="IM Channel Connections" icon="comments">
+  <Card title="IM Channel Connections" icon="comments" href="/guides/im-channels">
     Chat with your agent inside **Telegram**, **Slack**, **Discord**, **Feishu/Lark**, **DingTalk**, **WeCom**, and **WeChat**. No public IP or provider webhook is required. Per-user and per-channel session overrides let you assign different agents and context modes to different users.
   </Card>
-  <Card title="Embedded Python Client & TUI" icon="terminal">
-    Use `DeerFlowClient` as a library inside your own Python scripts, or launch the `deerflow` terminal workbench for a keyboard-driven chat surface — no Gateway, frontend, nginx, or Docker required. Both share the same `config.yaml`, checkpointer, skills, memory, MCP, and sandbox settings.
+  <Card title="Embedded Python Client & TUI" icon="terminal" href="/reference/python-client">
+    Use `DeerFlowClient` as a library inside your own Python scripts, or launch the `deerflow` terminal workbench for a keyboard-driven chat surface — no full server stack required. Both share the same `config.yaml`, skills, memory, MCP, and sandbox settings.
   </Card>
-  <Card title="Scheduled Tasks" icon="clock">
+  <Card title="Scheduled Tasks" icon="clock" href="/guides/scheduled-tasks">
     Create `once` or `cron` scheduled tasks from the workspace UI. Each task can reuse a thread or create a fresh one per run, and a `skip` overlap policy prevents duplicate executions on the same reused thread.
   </Card>
 </CardGroup>

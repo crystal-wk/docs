@@ -1,7 +1,7 @@
 ---
 title: "DeerFlow Architecture: Services, Routing, and Agent Runtime"
 sidebarTitle: "Architecture"
-description: "Understand DeerFlow's four-service architecture: Nginx proxy, Gateway API, Next.js frontend, and optional Kubernetes Provisioner."
+description: "Understand DeerFlow's four-service architecture: the Nginx proxy, Gateway API, Next.js frontend, and optional Kubernetes Provisioner service."
 ---
 
 DeerFlow runs as a cohesive stack of four cooperating services wired together by a single Nginx reverse proxy. Whether you start with `make dev` for local development or `make up` for a production Docker deployment, the same topology applies: Nginx is the only public-facing entry point, the Gateway API owns the entire agent runtime, the Next.js frontend delivers the web interface, and an optional Provisioner service handles Kubernetes-based sandbox orchestration when you need it.
@@ -37,7 +37,7 @@ This means your browser always connects to `localhost:2026`. Nginx handles all p
 
 The Lead Agent (`lead_agent`) is the single LangGraph agent at the heart of DeerFlow. Every message you send flows through it. It combines dynamic model selection with vision and thinking support, a layered middleware chain for cross-cutting concerns, a rich tool ecosystem, and the ability to delegate work to sub-agents in parallel.
 
-The Lead Agent is created via `make_lead_agent(config)` and runs embedded inside the Gateway API process, so there is no separate agent service to manage.
+The Lead Agent is instantiated at startup and runs embedded inside the Gateway API process, so there is no separate agent service to manage.
 
 ### Middleware Chain
 

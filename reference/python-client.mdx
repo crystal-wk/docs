@@ -1,10 +1,10 @@
 ---
-title: "DeerFlow Python Client Reference"
+title: "DeerFlow Python Client and deerflow CLI Full Reference"
 sidebarTitle: "Python Client"
 description: "Embed DeerFlow in your Python application using DeerFlowClient. Covers chat, streaming, model management, skill control, file uploads, and goal setting."
 ---
 
-`DeerFlowClient` lets you drive DeerFlow programmatically from Python — the same harness that powers the web UI, with no separate Gateway process required. You can chat, stream events, manage skills, upload files, and persist goals all from plain Python code.
+`DeerFlowClient` lets you drive DeerFlow programmatically from Python — the same harness that powers the web UI, with no separate Gateway process required. You can chat, stream events, manage skills, upload files, and persist goals all from plain Python code. The `deerflow` CLI ships in the same package and gives you headless one-shot runs and a full terminal workbench without starting any services.
 
 ## Installation
 
@@ -40,7 +40,8 @@ Use `stream()` to receive incremental events as the agent works. This is the pre
 
 ```python
 for event in client.stream("Summarize the latest AI news"):
-    print(event)
+    if event.type == "messages-tuple" and event.data.get("type") == "ai":
+        print(event.data["content"])
 ```
 
 Each iteration yields a `StreamEvent`. The possible event types are:
@@ -113,3 +114,29 @@ for event in client.stream(
 ```
 
 See the [Context Modes reference](/reference/context-modes) for a full comparison of Flash, Standard, Pro, and Ultra.
+
+## deerflow CLI
+
+The `deerflow` command-line tool ships with `deerflow-harness[tui]` and runs entirely embedded — no Gateway, frontend, Nginx, or Docker required. It uses the same `config.yaml`, checkpointer, skills, memory, MCP, and sandbox settings as the rest of DeerFlow.
+
+```shell
+deerflow                                  # launch the interactive terminal UI (TTY required)
+deerflow --continue                       # resume the most recent thread
+deerflow --resume THREAD_ID               # resume a specific thread by ID
+deerflow --print "summarize this repo"    # headless one-shot answer printed to stdout
+deerflow --json  "hello"                  # headless run, output as newline-delimited StreamEvents
+deerflow --recursion-limit 250 --print "run a longer task"
+```
+
+| Flag | Description |
+|---|---|
+| _(none)_ | Launch the interactive terminal workbench (TTY required) |
+| `--print MESSAGE` | Run the agent headlessly and print the final answer to stdout |
+| `--json MESSAGE` | Run the agent headlessly and output newline-delimited `StreamEvent` JSON |
+| `--resume THREAD_ID` | Resume a thread by its ID |
+| `--continue` | Resume the most recently used thread |
+| `--recursion-limit N` | Override the agent-loop recursion limit (default: 100) |
+
+Sessions started in the TUI also appear in the Web UI sidebar — both share the same thread store, so terminal and web stay in sync without running the Gateway.
+
+See the [TUI guide](/guides/tui) for the full keyboard reference and slash-command palette.

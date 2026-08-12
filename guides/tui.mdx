@@ -1,5 +1,5 @@
 ---
-title: "Use the DeerFlow Terminal Workbench (TUI)"
+title: "Run DeerFlow Agents in the Terminal with the TUI CLI"
 sidebarTitle: "TUI"
 description: "Run DeerFlow agents directly in your terminal with the deerflow CLI. No Gateway, frontend, or Docker required. Supports interactive TUI and headless modes."
 ---
@@ -28,6 +28,7 @@ Choose the mode that fits your workflow:
 |---|---|
 | `deerflow` | Launch TUI when stdin/stdout are TTYs (auto-detect) |
 | `deerflow --tui` | Force TUI mode |
+| `deerflow chat` | Same TUI conversation surface as `deerflow --tui` |
 | `deerflow --cli` | Force headless/classic mode for one invocation |
 | `deerflow --tui-transparent` | Use terminal default background instead of DeerFlow palette |
 | `deerflow --continue` | Resume the most recent thread |
@@ -35,6 +36,7 @@ Choose the mode that fits your workflow:
 | `deerflow --print "question"` | Headless one-shot answer to stdout |
 | `deerflow --json "question"` | Headless newline-delimited `StreamEvent`s |
 | `deerflow --recursion-limit 250 --print "question"` | Headless one-shot with custom agent-loop limit |
+| `echo "question" \| deerflow --print` | Read the question from stdin in headless mode |
 
 <Note>
   Headless runs (`--print`, `--json`) use a recursion limit of `100` by default. Pass `--recursion-limit` when your task requires a longer agent loop. This is a LangGraph super-step budget — it counts both model calls and tool-execution steps, not conversational turns.
@@ -90,7 +92,7 @@ Type `/` in the composer to open the command palette. Available commands:
 
 Activate a specific skill for a single turn by starting your message with `/<skill-name>`:
 
-```
+```text
 /data-analysis analyze uploads/report.csv
 ```
 
@@ -104,7 +106,7 @@ This loads that skill's `SKILL.md` as hidden context for the current turn, follo
 
 Use `/goal` to set a persistent goal for the current thread. DeerFlow surfaces the goal to the agent at the start of each turn, keeping long-running sessions oriented.
 
-```
+```text
 /goal Complete a full competitive analysis of the top 5 players in the market
 ```
 
@@ -112,9 +114,9 @@ Run `/goal` with no arguments to display the current goal, or `/goal clear` to r
 
 ## Web UI Visibility
 
-Sessions you open in the TUI appear in the DeerFlow web UI conversation list. The TUI writes a `threads_meta` row to the same database the Gateway reads, owned by the local default user. This means your terminal and web sessions stay in sync — without running the Gateway process.
+Sessions you open in the TUI appear in the DeerFlow web UI conversation list. The TUI writes conversation metadata to the same database the Gateway reads, owned by the local default user. This means your terminal and web sessions stay in sync — without running the Gateway process.
 
-When the database backend is `memory`, the write degrades to a silent no-op and the TUI still works; those threads just will not appear in the web sidebar.
+When the database backend is `memory`, this sync degrades to a silent no-op and the TUI still works; those threads just will not appear in the web sidebar.
 
 ## Headless Scripting
 
