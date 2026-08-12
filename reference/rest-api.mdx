@@ -1,0 +1,229 @@
+---
+title: "DeerFlow REST API Reference"
+sidebarTitle: "REST API"
+description: "HTTP API endpoints for DeerFlow's Gateway. Covers models, skills, agents, memory, threads, uploads, artifacts, MCP config, and streaming runs."
+---
+
+DeerFlow exposes a REST API through its Gateway (port 8001), proxied through Nginx at port 2026. All API paths below use the base URL `http://localhost:2026`. The LangGraph-compatible endpoints live under `/api/langgraph/`, and all other resource endpoints live under `/api/`.
+
+<Note>
+  In the default local setup there is no authentication. For production deployments, place an auth gateway in front of Nginx before exposing any port to the internet.
+</Note>
+
+Interactive API documentation (Swagger UI) is available at `http://localhost:2026/docs` when the `GATEWAY_ENABLE_DOCS` environment variable is set to `true`.
+
+## Health Check
+
+Verify that the Gateway is running before making other requests.
+
+```
+GET /health
+```
+
+```shell
+curl http://localhost:2026/health
+```
+
+## Models
+
+Return the list of LLM models configured in `config.yaml`, including their display names and provider details.
+
+```
+GET /api/models
+```
+
+```shell
+curl http://localhost:2026/api/models
+```
+
+## Skills
+
+List all available skills or toggle a skill's enabled state.
+
+```
+GET  /api/skills
+PUT  /api/skills/<skill_name>
+```
+
+<CodeGroup>
+
+```shell List skills
+curl http://localhost:2026/api/skills
+```
+
+```shell Enable a skill
+curl -X PUT http://localhost:2026/api/skills/web-search \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": true}'
+```
+
+</CodeGroup>
+
+## Agents
+
+Return the list of registered sub-agents (for example `general-purpose` and `bash`).
+
+```
+GET /api/agents
+```
+
+```shell
+curl http://localhost:2026/api/agents
+```
+
+## Memory
+
+Return the current memory contents for the active user, including user context, conversation history summaries, and confidence-scored facts.
+
+```
+GET /api/memory
+```
+
+```shell
+curl http://localhost:2026/api/memory
+```
+
+## Threads and Runs
+
+Use the LangGraph-compatible API to create threads, stream agent runs, retrieve history, and delete threads.
+
+### Create a Thread
+
+```shell
+curl -X POST http://localhost:2026/api/langgraph/threads \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+The response includes a `thread_id` UUID. Use this value in subsequent requests.
+
+### Stream a Run
+
+Send a message to a thread and stream the agent's response as Server-Sent Events (SSE).
+
+```shell
+curl -N -X POST http://localhost:2026/api/langgraph/threads/{thread_id}/runs/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "assistant_id": "agent",
+    "input": {
+      "messages": [{"role": "human", "content": "Hello!"}]
+    },
+    "config": {
+      "configurable": {
+        "is_plan_mode": false,
+        "thinking_enabled": true,
+        "subagent_enabled": false
+      }
+    }
+  }'
+```
+
+### Get Thread History
+
+```
+GET /api/langgraph/threads/{thread_id}/history
+```
+
+```shell
+curl http://localhost:2026/api/langgraph/threads/{thread_id}/history
+```
+
+### Delete a Thread
+
+```
+DELETE /api/threads/{thread_id}
+```
+
+```shell
+curl -X DELETE http://localhost:2026/api/threads/{thread_id}
+```
+
+## Uploads
+
+Upload files to a thread or list previously uploaded files. DeerFlow automatically converts PDF, PPTX, XLSX, and DOCX files to Markdown on ingest.
+
+```
+POST /api/threads/{thread_id}/uploads
+GET  /api/threads/{thread_id}/uploads/list
+```
+
+<CodeGroup>
+
+```shell Upload a file
+curl -X POST http://localhost:2026/api/threads/{thread_id}/uploads \
+  -F "files=@./report.pdf"
+```
+
+```shell List uploaded files
+curl http://localhost:2026/api/threads/{thread_id}/uploads/list
+```
+
+</CodeGroup>
+
+## Artifacts
+
+Retrieve files that the agent generated during a run (for example, written reports or processed datasets).
+
+```
+GET /api/threads/{thread_id}/artifacts/{path}
+```
+
+```shell
+curl http://localhost:2026/api/threads/{thread_id}/artifacts/output.md
+```
+
+## MCP Configuration
+
+Read or replace the MCP server configuration atomically. The `PUT` endpoint replaces the entire `mcpServers` map in one operation.
+
+```
+GET /api/mcp/config
+PUT /api/mcp/config
+```
+
+<CodeGroup>
+
+```shell Get MCP config
+curl http://localhost:2026/api/mcp/config
+```
+
+```shell Update MCP config
+curl -X PUT http://localhost:2026/api/mcp/config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mcpServers": {
+      "github": {
+        "enabled": true,
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "env": {"GITHUB_TOKEN": "$GITHUB_TOKEN"}
+      }
+    }
+  }'
+```
+
+</CodeGroup>
+
+## SSE Stream Events
+
+Streaming runs return Server-Sent Events. Each event has the format:
+
+```
+event: <event_type>
+data: <json_data>
+```
+
+| Event Type | Description |
+|---|---|
+| `metadata` | Run metadata including `run_id` |
+| `values` | Full state snapshot with the `messages` array |
+| `messages-tuple` | Incremental message updates (AI text chunks, tool calls, tool results) |
+| `end` | Stream is complete |
+
+To extract the final AI response, find the last `values` event and read the `content` field of the last message in the `messages` array with `type: "ai"`.
+
+<Tip>
+  Pass `-N` to `curl` when streaming to disable output buffering, so you see events as they arrive rather than all at once at the end.
+</Tip>

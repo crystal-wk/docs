@@ -1,0 +1,81 @@
+---
+title: "Automate Work with DeerFlow Scheduled Tasks"
+sidebarTitle: "Scheduled Tasks"
+description: "Create one-time and recurring cron tasks in DeerFlow. Schedule agent runs, reuse threads, and manage tasks from the web UI at /workspace/scheduled-tasks."
+---
+
+DeerFlow's scheduler lets you automate agent runs on a one-time or recurring cron schedule. Enable it in `config.yaml`, then create and manage tasks from the `/workspace/scheduled-tasks` page in the web UI. Scheduled runs use the same DeerFlow run lifecycle as interactive conversations — the agent has full access to tools, memory, skills, and the sandbox.
+
+## Enable the Scheduler
+
+Add the `scheduler` block to your `config.yaml` and restart the Gateway:
+
+```yaml
+scheduler:
+  enabled: true
+  poll_interval_seconds: 5
+  lease_seconds: 120
+  max_concurrent_runs: 3
+  min_once_delay_seconds: 60
+```
+
+| Field | Description |
+|---|---|
+| `enabled` | Set to `true` to activate background polling. Defaults to `false`. |
+| `poll_interval_seconds` | How often the scheduler checks for due tasks. |
+| `lease_seconds` | How long a claimed run holds its lease before it can be reclaimed. |
+| `max_concurrent_runs` | Global cap on active scheduled runs across all poll cycles. |
+| `min_once_delay_seconds` | Minimum time in the future for a `once` task. |
+
+All scheduler fields take effect on Gateway restart.
+
+## Schedule Types
+
+DeerFlow supports two schedule types:
+
+<CardGroup cols={2}>
+  <Card title="once" icon="clock">
+    Run the agent once at a specific future time. Use this for one-off automated tasks, timed reports, or time-sensitive operations.
+  </Card>
+  <Card title="cron" icon="rotate">
+    Run the agent repeatedly on a cron expression schedule. Use this for recurring research, daily summaries, automated monitoring, or any periodic workflow.
+  </Card>
+</CardGroup>
+
+When a `cron` run is still active at the next scheduled time, DeerFlow uses `skip` overlap behavior — the missed execution is skipped rather than queued, keeping your thread clean.
+
+## Managing Tasks
+
+Navigate to `/workspace/scheduled-tasks` in the DeerFlow web UI to manage all your scheduled tasks. From this page you can:
+
+- **Create** a new `once` or `cron` task, set the schedule, write the agent prompt, and choose thread behavior
+- **Pause** a recurring task without deleting it
+- **Resume** a paused task to restart its schedule
+- **Trigger manually** to run a task immediately outside its normal schedule using the same task definition and execution path
+- **Inspect history** to review past run outcomes, timing, and outputs
+- **Delete** a task to permanently remove it and its run history
+
+## Thread Behavior
+
+When you create a scheduled task, choose how DeerFlow manages the conversation thread for each run:
+
+<Tabs>
+  <Tab title="Thread Reuse">
+    Every scheduled run appends to the same conversation thread. The agent has access to prior turns, memory from earlier runs, and accumulated context. Best for ongoing research or monitoring tasks where continuity matters.
+  </Tab>
+  <Tab title="Fresh Per Run">
+    Each scheduled run starts a new thread. The agent has no context from previous runs unless you explicitly store information in long-term memory. Best for independent daily summaries or one-shot reports.
+  </Tab>
+</Tabs>
+
+## Multi-Worker Deployments
+
+<Note>
+  Multi-worker deployments (`GATEWAY_WORKERS > 1`) require the Postgres database backend and `run_events.backend: db`. SQLite ignores row-level locks, and memory or JSONL run-event stores are process-local — they cannot enforce singleton delivery across workers. DeerFlow fails fast at startup if you use an incompatible combination.
+</Note>
+
+Single-worker deployments (`GATEWAY_WORKERS=1`) work with any supported database backend, including SQLite.
+
+<Tip>
+  Scheduled tasks are great for recurring research, daily briefings, automated competitive monitoring, or any workflow you currently run manually on a fixed cadence.
+</Tip>

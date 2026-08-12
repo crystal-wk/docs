@@ -1,0 +1,83 @@
+---
+title: "DeerFlow Architecture: Services, Routing, and Agent Runtime"
+sidebarTitle: "Architecture"
+description: "Understand DeerFlow's four-service architecture: Nginx proxy, Gateway API, Next.js frontend, and optional Kubernetes Provisioner."
+---
+
+DeerFlow runs as a cohesive stack of four cooperating services wired together by a single Nginx reverse proxy. Whether you start with `make dev` for local development or `make up` for a production Docker deployment, the same topology applies: Nginx is the only public-facing entry point, the Gateway API owns the entire agent runtime, the Next.js frontend delivers the web interface, and an optional Provisioner service handles Kubernetes-based sandbox orchestration when you need it.
+
+## Service Topology
+
+Each service has a fixed port and a well-scoped responsibility. You interact only with Nginx — the other three services are container-internal and are not published to the host by default.
+
+| Service | Port | Role |
+|---|---|---|
+| Nginx | 2026 | Unified reverse-proxy entry point — open this in your browser |
+| Gateway API | 8001 | FastAPI REST + LangGraph-compatible agent runtime |
+| Frontend | 3000 | Next.js web interface |
+| Provisioner | 8002 | Optional: sandbox orchestration for Kubernetes mode |
+
+<Note>
+Both Compose files publish the Nginx port as `"${BIND_HOST:-127.0.0.1}:${PORT:-2026}:2026"` — **loopback-only by default**. To reach DeerFlow from another machine, set `BIND_HOST=0.0.0.0` in your `.env` and put proper access controls in place first.
+</Note>
+
+## Request Routing
+
+Nginx inspects the path of every inbound request and forwards it to the right upstream service:
+
+| Path pattern | Upstream | Purpose |
+|---|---|---|
+| `/api/langgraph/*` | Gateway API | LangGraph-compatible agent interactions, threads, and streaming — rewritten to `/api/*` |
+| `/api/*` (all other) | Gateway API | REST endpoints: models, MCP, skills, memory, artifacts, uploads |
+| `/` (everything else) | Frontend | Next.js web interface |
+
+This means your browser always connects to `localhost:2026`. Nginx handles all path-based routing transparently so you never need to call the Gateway on port 8001 directly.
+
+## The Lead Agent
+
+The Lead Agent (`lead_agent`) is the single LangGraph agent at the heart of DeerFlow. Every message you send flows through it. It combines dynamic model selection with vision and thinking support, a layered middleware chain for cross-cutting concerns, a rich tool ecosystem, and the ability to delegate work to sub-agents in parallel.
+
+The Lead Agent is created via `make_lead_agent(config)` and runs embedded inside the Gateway API process, so there is no separate agent service to manage.
+
+### Middleware Chain
+
+Before and after each turn, DeerFlow runs a chain of middleware functions in strict order. From your perspective as a user, these middlewares deliver the following capabilities automatically:
+
+| Function | What it does for you |
+|---|---|
+| Thread isolation | Each conversation gets its own workspace, uploads, and outputs directory |
+| File uploads | Files you upload are immediately available to the agent inside the sandbox |
+| Sandbox execution | Agent-generated code runs in an isolated environment, not on the host process |
+| Context summarization | When a long conversation approaches token limits, it is automatically condensed |
+| Task tracking | Multi-step plans are tracked and displayed as a to-do list in the UI |
+| Memory extraction | Key facts from your conversations are queued for async extraction and future injection |
+
+<Tip>
+You do not configure individual middlewares by name. Features like summarization and task tracking are enabled or disabled via their respective sections in `config.yaml` (for example `summarization.enabled` and the planning mode setting).
+</Tip>
+
+## How a Request Flows
+
+When you send a message, it travels through the stack and streams back to you like this:
+
+<Steps>
+  <Step title="Browser → Nginx">
+    Your browser sends the request to `localhost:2026`. Nginx terminates the connection and forwards it based on the path.
+  </Step>
+  <Step title="Nginx → Gateway API">
+    Nginx rewrites `/api/langgraph/*` paths to the Gateway's native `/api/*` routers and proxies the request to port 8001 inside the container network.
+  </Step>
+  <Step title="Gateway → Lead Agent">
+    The Gateway validates the request, resolves the authenticated user and thread, and hands the message to the Lead Agent via the LangGraph runtime.
+  </Step>
+  <Step title="Lead Agent → Tools and Sub-Agents">
+    The Lead Agent runs its middleware chain, selects tools, and optionally delegates subtasks to sub-agents running in parallel background threads.
+  </Step>
+  <Step title="Response streamed back">
+    Results stream back through the Gateway as Server-Sent Events (SSE). The frontend receives the stream and renders it progressively in the chat UI.
+  </Step>
+</Steps>
+
+<Note>
+Nginx is always the public entry point. The Gateway's port 8001 is deliberately not published to the host — it is accessible only within the container network. This design keeps the entire external surface to a single port.
+</Note>

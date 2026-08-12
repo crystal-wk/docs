@@ -1,0 +1,115 @@
+---
+title: "DeerFlow Python Client Reference"
+sidebarTitle: "Python Client"
+description: "Embed DeerFlow in your Python application using DeerFlowClient. Covers chat, streaming, model management, skill control, file uploads, and goal setting."
+---
+
+`DeerFlowClient` lets you drive DeerFlow programmatically from Python — the same harness that powers the web UI, with no separate Gateway process required. You can chat, stream events, manage skills, upload files, and persist goals all from plain Python code.
+
+## Installation
+
+Install the `deerflow-harness` package with `uv`. Add the optional `tui` extra if you also want the terminal workbench available in the same environment.
+
+```shell
+uv pip install deerflow-harness
+# or with TUI support:
+uv pip install 'deerflow-harness[tui]'
+```
+
+## Basic Chat
+
+Import `DeerFlowClient` and call `chat()` to send a single message and receive a complete response. Pass a `thread_id` to associate the message with a conversation thread.
+
+```python
+from deerflow.client import DeerFlowClient
+
+client = DeerFlowClient()
+
+# Single response
+response = client.chat("Analyze this paper for me", thread_id="my-thread")
+print(response)
+```
+
+<Tip>
+  Thread IDs persist across calls. Reuse the same `thread_id` to continue an existing conversation — the agent remembers the full history of that thread.
+</Tip>
+
+## Streaming
+
+Use `stream()` to receive incremental events as the agent works. This is the preferred method for long-running research or multi-step tasks where you want to display progress in real time.
+
+```python
+for event in client.stream("Summarize the latest AI news"):
+    print(event)
+```
+
+Each iteration yields a `StreamEvent`. The possible event types are:
+
+| Event Type | Description |
+|---|---|
+| `metadata` | Run metadata including `run_id` |
+| `values` | Full state snapshot with the `messages` array |
+| `messages-tuple` | Incremental message updates (text chunks, tool calls, tool results) |
+| `end` | Stream is complete |
+
+## Model and Skill Management
+
+List the models configured in your `config.yaml`, and inspect or toggle individual skills at runtime.
+
+```python
+# List available models
+models = client.list_models()
+
+# List and manage skills
+skills = client.list_skills()
+client.update_skill("web-search", enabled=True)
+```
+
+## File Uploads
+
+Upload one or more files to a thread before sending your message. DeerFlow automatically converts PDF, PPTX, XLSX, and DOCX files to Markdown so the agent can read them as context.
+
+```python
+# Upload files to a thread (PDF, PPTX, XLSX, DOCX supported)
+client.upload_files("thread-1", ["./report.pdf", "./data.xlsx"])
+```
+
+After uploading, send a message on the same `thread_id` and the agent will have access to the file contents.
+
+## Session Goals
+
+Set a persistent goal for a thread. The goal is injected into the agent's system prompt for every subsequent turn on that thread, keeping long-running work on track without you needing to repeat the objective.
+
+```python
+# Set a persistent goal for a thread
+client.set_goal("thread-1", "finish the implementation and make all tests pass")
+```
+
+## Method Reference
+
+| Method | Description |
+|---|---|
+| `client.chat(message, thread_id)` | Send a message and get a complete response |
+| `client.stream(message, thread_id)` | Stream events from a conversation |
+| `client.list_models()` | List available LLM models |
+| `client.list_skills()` | List available skills |
+| `client.update_skill(name, enabled)` | Enable or disable a skill |
+| `client.upload_files(thread_id, paths)` | Upload files to a thread |
+| `client.set_goal(thread_id, goal)` | Set a session goal for a thread |
+
+## Context Modes
+
+Pass `is_plan_mode`, `thinking_enabled`, and `subagent_enabled` to `stream()` (or `chat()`) to control how much reasoning and delegation the agent applies to a request.
+
+```python
+for event in client.stream(
+    "Research recent AI developments",
+    thread_id="research-1",
+    is_plan_mode=True,
+    thinking_enabled=True,
+    subagent_enabled=True,
+):
+    print(event)
+```
+
+See the [Context Modes reference](/reference/context-modes) for a full comparison of Flash, Standard, Pro, and Ultra.

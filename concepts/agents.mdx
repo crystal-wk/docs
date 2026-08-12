@@ -1,0 +1,83 @@
+---
+title: "Agents in DeerFlow: Lead Agent and Sub-Agents"
+sidebarTitle: "Agents"
+description: "Learn how DeerFlow's lead agent orchestrates sub-agents, delegates tasks, and handles multi-step workflows with delegation caps and parallel execution."
+---
+
+DeerFlow gives you a single conversational entry point — the Lead Agent — that can silently spawn and coordinate multiple specialized Sub-Agents to tackle complex, multi-step work. You interact with the Lead Agent directly; it decides when a task benefits from delegation, manages parallel execution, and assembles the results before responding to you.
+
+## The Lead Agent
+
+The Lead Agent is the LangGraph-powered core of DeerFlow. Every message you send is processed by it. At each turn it:
+
+1. Runs the middleware chain (thread isolation, uploads, sandbox acquisition, summarization, task tracking, memory, and more).
+2. Selects a system prompt enriched with your enabled skills, injected memory facts, and working-directory guidance.
+3. Chooses from its full tool ecosystem to answer your request — or delegates subtasks to sub-agents when parallelism or specialization helps.
+4. Streams the response back incrementally.
+
+The Lead Agent supports dynamic model selection per request, vision inputs, and thinking mode — all configurable from the model settings in the UI or `config.yaml`.
+
+## Sub-Agents
+
+Sub-agents are background agent instances the Lead Agent spawns when it needs to parallelize work or apply a specialist toolset. You do not invoke them directly; the Lead Agent calls the `task()` tool to delegate work and then polls for results.
+
+### Built-in Sub-Agent Types
+
+<CardGroup cols={2}>
+  <Card title="general-purpose" icon="robot">
+    Has access to the full tool ecosystem — sandbox, search, MCP, and built-in tools. Used for research, writing, and general multi-step tasks.
+  </Card>
+  <Card title="bash" icon="terminal">
+    A shell-execution specialist. Only exposed when shell access is enabled (Docker or BoxLite sandbox). Optimized for scripting and system operations.
+  </Card>
+</CardGroup>
+
+### Concurrency and Caps
+
+DeerFlow enforces limits to keep costs and resource use predictable:
+
+- **Max 3 sub-agents per turn** — the Lead Agent can run up to three sub-agents in parallel during a single response.
+- **15-minute timeout** — each sub-agent run is capped at 15 minutes.
+- **Delegation ledger** — the Lead Agent tracks every delegation it makes during a run.
+- **Total delegation cap per run** — a configurable `subagents.max_total_per_run` setting in `config.yaml` limits how many sub-agent delegations can occur across the entire run, preventing runaway chains.
+
+Sub-agents execute in background thread pools with live status tracking. Their progress appears as task cards in the chat UI via SSE events.
+
+## Session Goals
+
+A session goal gives the Lead Agent persistent direction across multiple turns. You set one with the `/goal` command in the chat input or the TUI slash-command palette.
+
+- **Multi-turn continuation** — the goal is injected into the system prompt on every subsequent turn, keeping the agent focused without you repeating context.
+- **Continuation count cap** — a `continuation_count` limit prevents the agent from autonomously continuing indefinitely; it will pause and check in with you once the cap is reached.
+- **Goal management** — use `/goal` to set or update the goal, or clear it when the task is complete. You can also manage goals programmatically via the embedded `DeerFlowClient`.
+
+## Context Modes
+
+DeerFlow offers four context modes that trade response speed for depth and capability. You select a mode in the UI model/settings picker or by configuring the default in `config.yaml`.
+
+| Mode | Thinking | Planning | Sub-Agents |
+|---|---|---|---|
+| Flash | Off | Off | Off |
+| Standard | On | Off | Off |
+| Pro | On | On | Off |
+| Ultra | On | On | On |
+
+<Tip>
+**Flash** is fastest and cheapest. **Ultra** enables the full pipeline — extended thinking, a planning phase that produces a visible task list, and parallel sub-agent execution. Start with Standard for most tasks and move up to Ultra for complex, multi-part research or coding projects.
+</Tip>
+
+## Tool Ecosystem
+
+The Lead Agent (and sub-agents) draw from a layered tool ecosystem. Tools are grouped by category and you can enable or disable groups in Settings → Tools or via `extensions_config.json`.
+
+| Category | Examples |
+|---|---|
+| Sandbox | `bash`, `ls`, `read_file`, `write_file`, `str_replace` |
+| Built-in | `present_files`, `ask_clarification`, `view_image`, `task` |
+| Search/Web | Tavily, Jina AI, DuckDuckGo, Crawl4AI, Firecrawl |
+| MCP | Any MCP server (stdio, SSE, or HTTP transport) |
+| Skills | Domain-specific workflows injected via system prompt |
+
+<Note>
+Per-agent model settings — including `temperature`, `max_tokens`, and `thinking_enabled` — can be overridden on a per-agent basis in `config.yaml` under `subagents.agents.<name>` or for custom agents in their own `config.yaml`. This lets you use a fast, cheap model for the bash sub-agent and a more capable one for the general-purpose agent.
+</Note>

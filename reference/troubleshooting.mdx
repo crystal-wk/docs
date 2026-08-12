@@ -1,0 +1,177 @@
+---
+title: "DeerFlow Troubleshooting Guide"
+sidebarTitle: "Troubleshooting"
+description: "Solve common DeerFlow setup and runtime issues including config errors, Docker failures, model connection problems, and skill loading issues."
+---
+
+Most DeerFlow issues fall into a small set of categories: missing or misconfigured files, Docker and network problems, and incorrect API keys. Work through the relevant section below to resolve your issue. If the fix isn't here, generate a support bundle and open a GitHub issue.
+
+## Quick Diagnostics
+
+Before diving into individual issues, run the built-in diagnostic commands from your project root:
+
+```shell
+# Check configuration and system requirements
+make doctor
+
+# Generate a redacted summary for GitHub issues
+make support-bundle
+```
+
+`make doctor` inspects your config files, environment variables, and system requirements and prints a human-readable report. `make support-bundle` produces a redacted archive you can attach directly to a GitHub issue at [github.com/bytedance/deer-flow/issues](https://github.com/bytedance/deer-flow/issues).
+
+## Common Issues
+
+<AccordionGroup>
+
+  <Accordion title="Config file not found">
+    **Cause:** `config.yaml` doesn't exist or DeerFlow is looking in the wrong directory.
+
+    **Fix:** Run `make config` from the project root to create `config.yaml` from the example template:
+
+    ```shell
+    make config
+    ```
+
+    If you store your config in a non-default location, set the `DEER_FLOW_CONFIG_PATH` environment variable to the absolute path of your file:
+
+    ```shell
+    export DEER_FLOW_CONFIG_PATH=/path/to/your/config.yaml
+    ```
+  </Accordion>
+
+  <Accordion title='"Invalid API key" errors'>
+    **Cause:** An LLM or search API key is missing from your environment, or the variable name referenced in `config.yaml` doesn't match the one you exported.
+
+    **Fix:** Open your `.env` file and confirm the key is present and spelled correctly. Then cross-check the `$VARIABLE_NAME` prefix in `config.yaml`:
+
+    ```yaml
+    models:
+      - name: gpt-4o
+        api_key: $OPENAI_API_KEY   # must match the exported variable name
+    ```
+
+    Run `make doctor` to get a report on which keys are missing.
+  </Accordion>
+
+  <Accordion title="Docker sandbox fails to start">
+    **Cause:** Docker is not running, port 8080 is already in use by another process, or the sandbox image hasn't been pulled yet.
+
+    **Fix:**
+
+    <Steps>
+      <Step title="Confirm Docker is running">
+        ```shell
+        docker info
+        ```
+        If the command fails, start Docker Desktop or the Docker daemon.
+      </Step>
+      <Step title="Pull the sandbox image">
+        ```shell
+        make docker-init
+        ```
+      </Step>
+      <Step title="Check port availability">
+        Ensure nothing else is bound to port 8080 on your host:
+        ```shell
+        lsof -i :8080
+        ```
+        Kill or move the conflicting process, then retry.
+      </Step>
+    </Steps>
+  </Accordion>
+
+  <Accordion title="Skills not loading">
+    **Cause:** A `SKILL.md` file is missing from a skill directory, the path in `config.yaml` points to the wrong location, or you have a nested `SKILL.md` that you expect to be treated as an independent skill.
+
+    **Fix:** Verify that each skill directory contains a `SKILL.md` at its root:
+
+    ```
+    skills/
+    └── public/
+        └── my-skill/
+            └── SKILL.md   ✅  required
+    ```
+
+    Check that `skills.path` in `config.yaml` points to the correct parent directory. Note that nested `SKILL.md` files (inside subdirectories of a skill) are **not** treated as independent skills — only the top-level `SKILL.md` in each skill directory is loaded.
+  </Accordion>
+
+  <Accordion title="MCP server not connecting">
+    **Cause:** The command referenced in your MCP config isn't installed or isn't on `PATH`, the connection is timing out, or the configuration contains a typo.
+
+    **Fix:**
+
+    1. Verify the command is available. For `npx`-based servers, confirm Node.js is installed:
+       ```shell
+       npx --version
+       ```
+    2. Increase `session_init_timeout` in your MCP server config if the server is slow to start.
+    3. Check server-level logs:
+       ```shell
+       make docker-logs
+       ```
+    4. Confirm your `extensions_config.json` uses the correct `type` field (`stdio`, `sse`, or `http`) for your server.
+  </Accordion>
+
+  <Accordion title="2 vCPU / 4 GB environment issues">
+    **Cause:** The host doesn't have enough CPU or memory to run the full DeerFlow stack alongside active agent workloads.
+
+    **Fix:** DeerFlow's minimum recommended spec is **4 vCPU / 8 GB RAM**. On smaller hosts you may see slow response times, OOM kills, or Docker sandbox failures. Upgrade your host or reduce concurrent workloads by lowering `subagents.max_per_turn` in `config.yaml`.
+  </Accordion>
+
+  <Accordion title="mem0 backend not connecting">
+    **Cause:** `MEM0_API_KEY` is not set in your environment, the `base_url` is incorrect, or you're hitting an HTTP endpoint without opting in.
+
+    **Fix:**
+
+    1. Export your API key:
+       ```shell
+       export MEM0_API_KEY=your-key-here
+       ```
+    2. Confirm `base_url` uses HTTPS:
+       ```yaml
+       backend_config:
+         base_url: https://api.mem0.ai  # must be HTTPS
+       ```
+    3. For trusted local development with an HTTP-only server, explicitly opt in:
+       ```yaml
+       backend_config:
+         allow_insecure_http: true  # never use across untrusted networks
+       ```
+
+    <Warning>
+      Never set `allow_insecure_http: true` for a server reachable over the internet. Every request carries your API key in plaintext over HTTP.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Frontend not loading at localhost:2026">
+    **Cause:** One or more services haven't finished starting, or Nginx isn't running.
+
+    **Fix:**
+
+    1. Wait 15–30 seconds after `make docker-start` — the Next.js frontend takes a moment to compile on first boot.
+    2. Check service logs for errors:
+       ```shell
+       make docker-logs
+       make docker-logs-frontend
+       ```
+    3. For local (non-Docker) setups, run the health check:
+       ```shell
+       make check
+       ```
+    4. If Nginx is the problem, restart the full stack:
+       ```shell
+       make docker-stop
+       make docker-start
+       ```
+  </Accordion>
+
+</AccordionGroup>
+
+## Getting Help
+
+If none of the above resolves your issue:
+
+1. Run `make support-bundle` to generate a redacted troubleshooting summary.
+2. Open an issue at [github.com/bytedance/deer-flow/issues](https://github.com/bytedance/deer-flow/issues) and attach the bundle.
+3. Check the `CHANGELOG` in the repo root — your issue may already be fixed in a recent release.

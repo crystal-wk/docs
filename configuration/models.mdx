@@ -1,0 +1,241 @@
+---
+title: "Configure LLM Models in DeerFlow"
+sidebarTitle: "Models"
+description: "Add and configure language model providers in DeerFlow's config.yaml. Covers OpenAI, Anthropic, DeepSeek, Claude Code, Codex CLI, and OpenAI-compatible gateways."
+---
+
+DeerFlow is model-agnostic: any LLM that exposes an OpenAI-compatible API or has a LangChain integration can be wired in through the `models` section of `config.yaml`. You can register multiple models simultaneously and select which one to use per conversation or per sub-agent role.
+
+## Basic Model Configuration
+
+Every model entry follows the same shape:
+
+```yaml
+models:
+  - name: gpt-4o               # Internal identifier used elsewhere in config
+    display_name: GPT-4o       # Human-readable label shown in the UI
+    use: langchain_openai:ChatOpenAI  # LangChain class path (module:ClassName)
+    model: gpt-4o              # Model identifier sent to the API
+    api_key: $OPENAI_API_KEY   # Always reference secrets via $VARIABLE_NAME
+    max_tokens: 4096           # Maximum tokens per response
+    temperature: 0.7           # Sampling temperature (0.0–1.0)
+```
+
+The `use` field determines which LangChain class DeerFlow instantiates. All remaining fields at the same level are forwarded as constructor keyword arguments to that class.
+
+## Supported Providers
+
+<CodeGroup>
+
+```yaml OpenAI
+models:
+  - name: gpt-4o
+    display_name: GPT-4o
+    use: langchain_openai:ChatOpenAI
+    model: gpt-4o
+    api_key: $OPENAI_API_KEY
+    max_tokens: 4096
+    temperature: 0.7
+```
+
+```yaml Anthropic
+models:
+  - name: claude-sonnet-4
+    display_name: Claude Sonnet 4
+    use: langchain_anthropic:ChatAnthropic
+    model: claude-sonnet-4-5
+    api_key: $ANTHROPIC_API_KEY
+    max_tokens: 8192
+    temperature: 0.7
+```
+
+```yaml DeepSeek
+models:
+  - name: deepseek-v3
+    display_name: DeepSeek V3
+    use: langchain_deepseek:ChatDeepSeek
+    model: deepseek-chat
+    api_key: $DEEPSEEK_API_KEY
+    max_tokens: 4096
+```
+
+```yaml OpenRouter (OpenAI-compatible)
+models:
+  - name: openrouter-gemini-2.5-flash
+    display_name: Gemini 2.5 Flash (OpenRouter)
+    use: langchain_openai:ChatOpenAI
+    model: google/gemini-2.5-flash-preview
+    api_key: $OPENROUTER_API_KEY
+    base_url: https://openrouter.ai/api/v1
+```
+
+```yaml Qwen3 via vLLM
+models:
+  - name: qwen3-32b-vllm
+    display_name: Qwen3 32B (vLLM)
+    use: deerflow.models.vllm_provider:VllmChatModel
+    model: Qwen/Qwen3-32B
+    api_key: $VLLM_API_KEY
+    base_url: http://localhost:8000/v1
+    supports_thinking: true
+    when_thinking_enabled:
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: true
+```
+
+</CodeGroup>
+
+<Note>
+  For `langchain_openai:ChatOpenAI`, the endpoint override key is `base_url` (not `api_base`). If you write `api_base` it is automatically normalized to `base_url`, and unrecognized keys are logged with a warning at model-build time.
+</Note>
+
+## CLI-Backed Providers
+
+DeerFlow can reuse your existing **Claude Code** or **Codex CLI** subscription as a model provider. These providers delegate inference to the CLI binary rather than calling a REST API directly.
+
+<CodeGroup>
+
+```yaml Claude Code OAuth
+models:
+  - name: claude-sonnet-4-6
+    display_name: Claude Sonnet 4.6 (Claude Code OAuth)
+    use: deerflow.models.claude_provider:ClaudeChatModel
+    model: claude-sonnet-4-6
+    max_tokens: 4096
+    supports_thinking: true
+```
+
+```yaml Codex CLI
+models:
+  - name: gpt-5.4
+    display_name: GPT-5.4 (Codex CLI)
+    use: deerflow.models.openai_codex_provider:CodexChatModel
+    model: gpt-5.4
+    supports_thinking: true
+    supports_reasoning_effort: true
+```
+
+</CodeGroup>
+
+**Authentication behavior for CLI-backed providers:**
+
+- `ClaudeChatModel` reads credentials from the `CLAUDE_CODE_OAUTH_TOKEN` environment variable, then `ANTHROPIC_AUTH_TOKEN`, then `CLAUDE_CODE_CREDENTIALS_PATH` (a single `.credentials.json` file path), and finally `~/.claude/.credentials.json` as a plaintext fallback.
+- `CodexChatModel` loads Codex CLI auth from `~/.codex/auth.json`. You can override the path with the `CODEX_AUTH_PATH` environment variable.
+- On macOS, DeerFlow does not probe the system Keychain automatically. Export Claude Code auth explicitly when needed:
+
+  ```shell
+  eval "$(python3 scripts/export_claude_code_oauth.py --print-export)"
+  ```
+
+## OpenAI Responses API
+
+To route OpenAI models through the `/v1/responses` endpoint instead of `/v1/chat/completions`, keep using `langchain_openai:ChatOpenAI` and set the two additional fields:
+
+```yaml
+models:
+  - name: gpt-5-responses
+    display_name: GPT-5 (Responses API)
+    use: langchain_openai:ChatOpenAI
+    model: gpt-5
+    api_key: $OPENAI_API_KEY
+    use_responses_api: true
+    output_version: responses/v1
+```
+
+## Thinking Models
+
+Some models support an extended "thinking" mode that improves performance on complex reasoning tasks. Enable it per-model with `supports_thinking: true` and provide the provider-specific `extra_body` payload:
+
+```yaml
+models:
+  - name: deepseek-v3
+    display_name: DeepSeek V3 (Thinking)
+    use: langchain_deepseek:ChatDeepSeek
+    model: deepseek-chat
+    api_key: $DEEPSEEK_API_KEY
+    supports_thinking: true
+    when_thinking_enabled:
+      extra_body:
+        thinking:
+          type: enabled
+```
+
+### Gemini via OpenAI-Compatible Gateway
+
+When routing Gemini through an OpenAI-compatible proxy with thinking enabled, the API attaches a `thought_signature` to each tool-call object. Standard `langchain_openai:ChatOpenAI` silently drops these signatures, causing the next request to fail with `HTTP 400 INVALID_ARGUMENT`. Use `PatchedChatOpenAI` instead — it re-injects the tool-call signatures on every outgoing payload:
+
+```yaml
+models:
+  - name: gemini-2.5-pro-thinking
+    display_name: Gemini 2.5 Pro (Thinking)
+    use: deerflow.models.patched_openai:PatchedChatOpenAI
+    model: google/gemini-2.5-pro-preview
+    api_key: $GEMINI_API_KEY
+    base_url: https://<your-openai-compat-gateway>/v1
+    max_tokens: 16384
+    supports_thinking: true
+    supports_vision: true
+    when_thinking_enabled:
+      extra_body:
+        thinking:
+          type: enabled
+```
+
+### MiMo via OpenAI-Compatible API
+
+MiMo returns a `reasoning_content` field on assistant messages in thinking mode. Standard `langchain_openai:ChatOpenAI` drops this field, causing `HTTP 400` errors on subsequent turns. Use `PatchedChatMiMo` for every MiMo thinking model entry:
+
+```yaml
+models:
+  - name: mimo-v2.5-pro
+    display_name: MiMo V2.5 Pro
+    use: deerflow.models.patched_mimo:PatchedChatMiMo
+    model: mimo-v2.5-pro
+    api_key: $MIMO_API_KEY
+    base_url: https://api.xiaomimimo.com/v1
+    max_tokens: 8192
+    supports_thinking: true
+    when_thinking_enabled:
+      extra_body:
+        thinking:
+          type: enabled
+    when_thinking_disabled:
+      extra_body:
+        thinking:
+          type: disabled
+```
+
+<Note>
+  For pay-as-you-go MiMo API keys (`sk-...`), use `https://api.xiaomimimo.com/v1`. For Token Plan keys (`tp-...`), use the regional Token Plan Base URL shown in the MiMo console (for example `https://token-plan-cn.xiaomimimo.com/v1`). These key types are separate and non-interchangeable.
+</Note>
+
+## Per-Agent Model Settings
+
+You can override `temperature`, `max_tokens`, and `thinking_enabled` on a per-agent basis in your agent configuration. This lets you use a high-temperature creative model for ideation agents and a low-temperature precise model for code agents while referencing the same base model entry:
+
+```yaml
+subagents:
+  agents:
+    researcher:
+      model: gpt-4o
+      temperature: 0.8
+      thinking_enabled: false
+    coder:
+      model: deepseek-v3
+      temperature: 0.2
+      thinking_enabled: true
+```
+
+## Recommended Models
+
+<Note>
+  ByteDance Volcengine's Coding Plan recommends **Doubao-Seed-2.0-Code**, **DeepSeek v3.2**, and **Kimi 2.5** as the highest-performing models for DeerFlow tasks. See the [ByteDance Volcengine Coding Plan](https://www.byteplus.com/en/activity/codingplan) for access details.
+</Note>
+
+For best results, choose models that offer:
+
+- **Long context windows** (100k+ tokens) for deep research and multi-step tasks
+- **Strong tool use** for reliable function calling and structured outputs
+- **Reasoning capabilities** for adaptive planning and complex decomposition
+- **Multimodal inputs** if your workflows involve images or documents

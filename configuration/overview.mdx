@@ -1,0 +1,142 @@
+---
+title: "DeerFlow Configuration Overview"
+sidebarTitle: "Overview"
+description: "Configure DeerFlow using config.yaml and extensions_config.json. Covers versioning, setup wizard, file locations, and configuration priority order."
+---
+
+DeerFlow uses two configuration files to control every aspect of its runtime behavior — from which language models it calls, to how it isolates code execution, to which IM channels it connects to. Understanding where these files live and how DeerFlow resolves them is the foundation for every other configuration task.
+
+## The Two Configuration Files
+
+### `config.yaml`
+
+`config.yaml` is the main application configuration file. It controls:
+
+- **models** — which LLM providers and model instances are available
+- **tools** — individual tool definitions and their provider settings
+- **tool_groups** — logical groupings of tools that can be enabled or disabled as a set
+- **sandbox** — code execution environment and isolation provider
+- **skills** — directory paths for specialized workflow skills
+- **memory** — long-term memory backend settings
+- **scheduler** — scheduled task polling and concurrency settings
+- **channels** — IM platform connections (Telegram, Slack, Discord, etc.)
+
+### `extensions_config.json`
+
+`extensions_config.json` holds configuration that changes more frequently at runtime:
+
+- **MCP servers** — Model Context Protocol server definitions, routing hints, and per-server settings
+- **Skill enabled states** — which skills are currently active
+
+DeerFlow updates `extensions_config.json` atomically when you toggle tools or MCP servers through **Settings → Tools** in the web UI, so you rarely need to edit it by hand.
+
+## Creating Your Configuration Files
+
+<Steps>
+  <Step title="Copy the templates">
+    Run the following command from the project root to copy both example files into place:
+
+    ```shell
+    make config
+    ```
+
+    This copies `config.example.yaml` → `config.yaml` and `extensions_config.example.json` → `extensions_config.json`. Your new files contain the full reference with every available option commented inline.
+  </Step>
+  <Step title="Edit config.yaml">
+    Open `config.yaml` and fill in at minimum one model entry with a valid API key. Refer to the [Models](/configuration/models) page for provider-specific examples.
+  </Step>
+  <Step title="Set your API keys">
+    Add secrets to the `.env` file in the project root (never in `config.yaml` directly):
+
+    ```shell
+    OPENAI_API_KEY=sk-...
+    TAVILY_API_KEY=tvly-...
+    ```
+
+    Reference them in `config.yaml` using the `$` prefix: `api_key: $OPENAI_API_KEY`.
+  </Step>
+  <Step title="Verify your setup">
+    Run the health check to confirm all required variables are present and reachable:
+
+    ```shell
+    make doctor
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  If you prefer an interactive walkthrough, run `make setup` instead of `make config`. The setup wizard prompts you for an LLM provider, optional web search, and sandbox preferences, then generates a minimal `config.yaml` and writes your keys directly to `.env`. It takes about two minutes and is the fastest way to get from zero to a running instance.
+</Tip>
+
+## Config Versioning
+
+`config.yaml` contains a `config_version` field that tracks schema changes. When DeerFlow starts, it compares your local version against the latest version in `config.example.yaml`. If your file is behind, you will see a startup warning:
+
+```
+WARNING - Your config.yaml (version 0) is outdated — the latest version is 1.
+Run `make config-upgrade` to merge new fields into your config.
+```
+
+Key versioning behaviors:
+
+- A missing `config_version` field is treated as version 0.
+- Running `make config-upgrade` auto-merges any new fields from the example file into your `config.yaml`. Your existing values are preserved and a `.bak` backup is created before any changes are written.
+- You can safely ignore the warning while experimenting, but apply the upgrade before deploying to production.
+
+## Configuration Priority Order
+
+When DeerFlow starts, it searches for `config.yaml` in the following order and uses the first match it finds:
+
+<Steps>
+  <Step title="DEER_FLOW_CONFIG_PATH environment variable">
+    If you set `DEER_FLOW_CONFIG_PATH` to an absolute file path, DeerFlow loads that file and stops searching. Use this when you manage multiple configurations or run DeerFlow from a CI pipeline.
+  </Step>
+  <Step title="config.yaml under DEER_FLOW_PROJECT_ROOT">
+    If `DEER_FLOW_PROJECT_ROOT` is set, DeerFlow looks for `config.yaml` in that directory. Set this variable when the process starts from a working directory that differs from your project root.
+  </Step>
+  <Step title="config.yaml in the current working directory">
+    When neither environment variable is set, DeerFlow looks for `config.yaml` in the directory where the process was launched.
+  </Step>
+  <Step title="Legacy locations">
+    For monorepo compatibility, DeerFlow also checks a small set of legacy backend and repository-root paths as a final fallback.
+  </Step>
+</Steps>
+
+## config.yaml Structure at a Glance
+
+The following is a map of every top-level section in `config.yaml`:
+
+```yaml
+# Main sections
+models:          # LLM configurations
+tools:           # Tool definitions
+tool_groups:     # Logical tool groupings
+sandbox:         # Execution environment
+skills:          # Skills directory paths
+memory:          # Memory backend settings
+scheduler:       # Scheduled tasks
+channels:        # IM channel connections
+```
+
+Each section is described in detail on its own page. Start with [Models](/configuration/models) to add your first LLM provider, then proceed to [Tools](/configuration/tools) and [Sandbox](/configuration/sandbox) to complete your setup.
+
+<Warning>
+  `config.yaml` is already listed in `.gitignore`. Never commit it to version control — it may contain API keys or other secrets even if you use `$VARIABLE_NAME` references, because the file also captures the structure of your deployment. Always use environment variables for secrets and treat the file itself as a local artifact.
+</Warning>
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="Models" href="/configuration/models" icon="brain">
+    Add LLM providers and configure model parameters.
+  </Card>
+  <Card title="Tools" href="/configuration/tools" icon="wrench">
+    Enable web search, file tools, and custom integrations.
+  </Card>
+  <Card title="Sandbox" href="/configuration/sandbox" icon="box">
+    Choose and configure a code execution provider.
+  </Card>
+  <Card title="Environment Variables" href="/configuration/environment-variables" icon="key">
+    Full reference for all supported environment variables.
+  </Card>
+</CardGroup>

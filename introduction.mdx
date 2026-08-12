@@ -1,0 +1,87 @@
+---
+title: "DeerFlow: Deep Exploration and Efficient Research Flow"
+sidebarTitle: "Introduction"
+description: "DeerFlow is an open-source AI super-agent harness that orchestrates sub-agents, memory, and sandboxed execution. Learn what it is and how it works."
+---
+
+DeerFlow is an open-source AI super-agent harness that lets you delegate almost anything to an intelligent agent — from deep research and code generation to scheduled workflows and IM-channel conversations. It combines a polished web interface, a terminal workbench, and an embeddable Python client, all driven by the same underlying LangGraph-powered runtime.
+
+## What Is DeerFlow?
+
+**DeerFlow** stands for **Deep Exploration and Efficient Research Flow**. The project started as an automated deep-research framework and has since become a full-featured super-agent harness. Its key value proposition is the combination of a battle-tested orchestration layer with an extensible skills system that lets you customize agent behavior without touching the core runtime.
+
+<Note>
+  **DeerFlow 2.0 is a ground-up rewrite.** It shares no code with v1. The original Deep Research framework is maintained on the [`1.x` branch](https://github.com/bytedance/deer-flow/tree/main-1.x), where contributions are still welcome. All active development has moved to 2.0.
+</Note>
+
+Visit the official website at [https://deerflow.tech](https://deerflow.tech) to explore live demos and case studies — no sign-in required.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Multi-Agent Orchestration" icon="network-wired">
+    The lead agent delegates tasks to specialist sub-agents on demand, supporting parallel execution, scoped context isolation, and structured result synthesis. A built-in delegation ledger prevents redundant re-delegation, and a total fan-out cap keeps resource usage predictable.
+  </Card>
+  <Card title="Sandboxed Code Execution" icon="box">
+    Run agent-generated code safely in one of five supported sandbox backends: **Docker** (AIO), **E2B** micro-VMs, **BoxLite**, **Kubernetes** pods via the provisioner service, or **Local** host execution. Switch backends with a single `config.yaml` change.
+  </Card>
+  <Card title="Extensible Skills System" icon="puzzle-piece">
+    Skills are `SKILL.md` packages that bundle workflow instructions, tool policies, and supporting resources. Users can install per-user custom skills, activate them with a slash command (`/skill-name`), and share them as `.skill` archives. Skills are loaded progressively to keep context windows lean.
+  </Card>
+  <Card title="Long-Term Memory" icon="brain">
+    DeerFlow persists user context and per-agent facts across sessions. Two pluggable backends ship out of the box: **DeerMem** (self-contained, file-backed with SQLite FTS5 retrieval) and **mem0** (cloud-native). Memory is consolidated automatically and stale facts are pruned by the LLM on a configurable schedule.
+  </Card>
+  <Card title="MCP Server Integration" icon="plug">
+    Connect any Model Context Protocol server — stdio or HTTP/SSE — to extend the agent's toolset. OAuth token flows (`client_credentials`, `refresh_token`) are supported for HTTP/SSE servers, and per-server `tool_call_timeout` prevents slow tools from blocking a run.
+  </Card>
+  <Card title="IM Channel Connections" icon="comments">
+    Chat with your agent inside **Telegram**, **Slack**, **Discord**, **Feishu/Lark**, **DingTalk**, **WeCom**, and **WeChat**. No public IP or provider webhook is required. Per-user and per-channel session overrides let you assign different agents and context modes to different users.
+  </Card>
+  <Card title="Embedded Python Client & TUI" icon="terminal">
+    Use `DeerFlowClient` as a library inside your own Python scripts, or launch the `deerflow` terminal workbench for a keyboard-driven chat surface — no Gateway, frontend, nginx, or Docker required. Both share the same `config.yaml`, checkpointer, skills, memory, MCP, and sandbox settings.
+  </Card>
+  <Card title="Scheduled Tasks" icon="clock">
+    Create `once` or `cron` scheduled tasks from the workspace UI. Each task can reuse a thread or create a fresh one per run, and a `skip` overlap policy prevents duplicate executions on the same reused thread.
+  </Card>
+</CardGroup>
+
+### LLM Provider Support
+
+DeerFlow is model-agnostic and works with any LLM that implements the OpenAI-compatible API. Supported providers include:
+
+- **OpenAI** — `langchain_openai:ChatOpenAI`, including the Responses API
+- **Anthropic** — `langchain_anthropic:ChatAnthropic`
+- **DeepSeek** — `langchain_deepseek:ChatDeepSeek`
+- **Qwen / vLLM** — `deerflow.models.vllm_provider:VllmChatModel`
+- **Claude Code** — `deerflow.models.claude_provider:ClaudeChatModel` (OAuth)
+- **Codex CLI** — `deerflow.models.openai_codex_provider:CodexChatModel`
+- **OpenRouter and compatible gateways** — any `langchain_openai:ChatOpenAI` with `base_url`
+
+DeerFlow performs best with models that support long context windows (100k+ tokens), reasoning/thinking capabilities, multimodal inputs, and reliable tool use.
+
+## Context Modes
+
+DeerFlow exposes four preset context modes that control how the agent reasons and whether it uses sub-agents. You can set these in `config.yaml` under the `channels.session.context` block or override them per user.
+
+| Mode | `thinking_enabled` | `is_plan_mode` | `subagent_enabled` |
+|---|:---:|:---:|:---:|
+| **Flash** | ✗ | ✗ | ✗ |
+| **Standard** | ✓ | ✗ | ✗ |
+| **Pro** | ✓ | ✓ | ✗ |
+| **Ultra** | ✓ | ✓ | ✓ |
+
+- **Flash** — fastest responses with no extended reasoning or sub-agent delegation.
+- **Standard** — enables the model's extended thinking for more accurate answers.
+- **Pro** — adds explicit plan-mode so the agent outlines its approach before executing.
+- **Ultra** — full power: thinking, planning, and parallel sub-agent delegation.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Install DeerFlow and run your first conversation in minutes.
+  </Card>
+  <Card title="Concepts & Architecture" icon="sitemap" href="/concepts/architecture">
+    Dive deeper into how the harness, sub-agents, skills, and memory work together.
+  </Card>
+</CardGroup>

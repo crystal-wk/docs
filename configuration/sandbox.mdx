@@ -1,0 +1,154 @@
+---
+title: "Configure DeerFlow Sandbox Providers"
+sidebarTitle: "Sandbox"
+description: "Set up DeerFlow's code execution sandbox. Choose from Local, Docker (AioSandbox), BoxLite micro-VM, E2B Cloud, or Kubernetes Provisioner providers."
+---
+
+DeerFlow executes agent-generated shell commands and code through a configurable sandbox provider. The provider you choose determines the degree of isolation between the agent's code and your host system. Picking the right provider is one of the most important security decisions in your deployment.
+
+## Provider Comparison
+
+| Provider | Isolation | Docker Socket | Best For |
+|---|---|---|---|
+| Local | Low | No | Dev / trusted single-user environments |
+| Docker (AioSandbox) | Medium | Yes (DooD) | General development use |
+| BoxLite | High | No | Production single-node deployments |
+| E2B Cloud | High | No | Cloud-hosted deployments |
+| Kubernetes (Provisioner) | Highest | No | Multi-tenant production |
+
+<Warning>
+  The **local** provider runs code directly inside the gateway process (or its container). It offers no strong isolation boundary. For any deployment that handles untrusted input or is shared across users, use Docker, BoxLite, E2B, or Kubernetes instead.
+</Warning>
+
+## Local Provider
+
+The local provider is the default and requires no additional infrastructure. Code runs directly on the host (or inside the gateway container in Docker deployments).
+
+```yaml
+sandbox:
+  use: deerflow.sandbox.local:LocalSandboxProvider
+  allow_host_bash: false
+```
+
+`allow_host_bash` is `false` by default and should stay that way for any workload where you do not fully trust the prompts being sent to the agent. Set it to `true` only for fully trusted single-user local workflows.
+
+## Docker (AioSandbox)
+
+AioSandbox runs each execution inside an isolated Docker container. It requires the host Docker daemon and uses Docker-outside-of-Docker (DooD) to create sandbox containers.
+
+```yaml
+sandbox:
+  use: deerflow.community.aio_sandbox:AioSandboxProvider
+  port: 8080
+  auto_start: true
+```
+
+<Steps>
+  <Step title="Pull the sandbox image">
+    Run the following once to pull the default AIO sandbox image:
+
+    ```shell
+    make docker-init
+    ```
+  </Step>
+  <Step title="Start DeerFlow">
+    ```shell
+    make docker-start
+    ```
+
+    DeerFlow auto-detects the sandbox mode from `config.yaml` and mounts the Docker socket only when `AioSandboxProvider` is configured without a `provisioner_url`.
+  </Step>
+</Steps>
+
+<Note>
+  Mounting `/var/run/docker.sock` into the gateway container grants that container root-equivalent control of the host. The Docker socket is **not** mounted by default — it is added only for the AIO mode. For internet-exposed or multi-tenant deployments, prefer the Kubernetes Provisioner or BoxLite, which do not require the Docker socket.
+</Note>
+
+## BoxLite Micro-VM
+
+BoxLite runs each sandbox in a daemonless OCI micro-VM. It provides strong isolation without requiring the Docker socket, making it well-suited for production single-node deployments.
+
+**Install the optional runtime first:**
+
+```shell
+uv pip install 'deerflow-harness[boxlite]'
+```
+
+**Configure the provider:**
+
+```yaml
+sandbox:
+  use: deerflow.community.boxlite:BoxliteProvider
+  image: python:3.12-slim
+  memory_mib: 1024    # optional per-VM memory cap
+  cpus: 2             # optional per-VM vCPU count
+  replicas: 3         # max active + warm VMs per gateway process
+  idle_timeout: 600   # seconds before an idle warm VM is stopped; 0 disables reaping
+```
+
+BoxLite boxes are scoped to `(user_id, thread_id)` and released into a warm pool after each turn. The same user and thread can reclaim their warm VM on the next request; different threads cannot share a VM. The `replicas` cap applies to the sum of active and warm VMs.
+
+## E2B Cloud
+
+E2B Cloud runs each execution in a managed cloud micro-VM. No local Docker socket or VM runtime is required — you only need an E2B API key.
+
+```yaml
+sandbox:
+  use: deerflow.community.e2b_sandbox:E2BSandboxProvider
+  api_key: $E2B_API_KEY
+  template: code-interpreter-v1
+  idle_timeout: 600
+  replicas: 3
+```
+
+<Note>
+  `replicas` in E2B mode is a process-local capacity limit on concurrent sandboxes. When the limit is reached, new acquire calls wait, burst, or are rejected according to your E2B plan's policy. Multi-gateway deployments that share the same E2B account should also configure `sandbox.ownership.type: redis` to prevent one gateway from terminating a sandbox that another gateway is actively using.
+</Note>
+
+`e2b-code-interpreter` is bundled as a core dependency of `deerflow-harness` — no extra install step is needed. Supply your API key and switch the `use` field in `config.yaml`.
+
+## Kubernetes (Provisioner)
+
+The Kubernetes Provisioner mode creates each sandbox in an isolated Kubernetes pod. The gateway communicates with a sidecar provisioner service over HTTP instead of using the Docker socket directly. This provides the strongest isolation and is recommended for multi-tenant production deployments.
+
+```yaml
+sandbox:
+  use: deerflow.community.aio_sandbox:AioSandboxProvider
+  provisioner_url: http://provisioner:8002
+```
+
+When `provisioner_url` is set, DeerFlow starts the `provisioner` container automatically when running `make docker-start`. In local or plain Docker sandbox modes, the provisioner service is not started.
+
+See the [Provisioner Setup Guide](https://github.com/bytedance/deer-flow/blob/main/docker/provisioner/README.md) for prerequisites, kubeconfig setup, and troubleshooting.
+
+## Building a Custom AIO Sandbox Image
+
+You can extend the default AIO sandbox image to pre-install system or Python dependencies. Keep the upstream startup command intact by not overriding `ENTRYPOINT` or `CMD`:
+
+```dockerfile
+FROM enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
+
+USER root
+
+# Example: add a system dependency
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends graphviz \
+    && rm -rf /var/lib/apt/lists/*
+
+# Example: add a Python dependency available inside the sandbox
+RUN python -m pip install --no-cache-dir pandas
+
+# Do not override ENTRYPOINT or CMD — keep the upstream sandbox server startup.
+```
+
+Reference your custom image in `config.yaml`:
+
+```yaml
+sandbox:
+  use: deerflow.community.aio_sandbox:AioSandboxProvider
+  image: your-registry/your-aio-sandbox:tag
+```
+
+<Note>
+  In Kubernetes Provisioner mode, sandbox pods are created by the provisioner service, not by the gateway directly. Configure the custom image via the provisioner's `SANDBOX_IMAGE` environment variable rather than `sandbox.image` in `config.yaml`.
+</Note>

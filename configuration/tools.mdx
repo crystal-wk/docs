@@ -1,0 +1,143 @@
+---
+title: "Configure Tools and Tool Groups in DeerFlow"
+sidebarTitle: "Tools"
+description: "Enable and configure built-in tools and web search engines in DeerFlow. Set up tool groups, Tavily search, Browserless screenshot capture, and custom tools."
+---
+
+DeerFlow ships with a set of built-in tools that give the agent the ability to search the web, read and write files, capture screenshots, and execute shell commands. You control which tools are available by defining them in `config.yaml` and organizing them into tool groups. You can also manage tools interactively from **Settings → Tools** in the web UI.
+
+## Tool Groups
+
+Tool groups are named sets that let you enable or disable related tools as a single unit. Define the groups you want active in the `tool_groups` section:
+
+```yaml
+tool_groups:
+  - name: web          # Web browsing and search
+  - name: file:read    # Read-only file operations
+  - name: file:write   # Write file operations
+  - name: bash         # Shell command execution
+```
+
+Any tool whose `group` field matches an entry in `tool_groups` is made available to the agent. Remove a group entry to disable all tools in that group at once.
+
+## Built-In Tools
+
+| Tool | Group | Description |
+|---|---|---|
+| `web_search` | `web` | Search the web using your configured search provider |
+| `web_fetch` | `web` | Fetch and extract content from a webpage |
+| `web_capture` | `web` | Capture a rendered screenshot of a webpage |
+| `image_search` | `web` | Search for reference images |
+| `ls` | `file:read` | List directory contents |
+| `read_file` | `file:read` | Read the contents of a file |
+| `write_file` | `file:write` | Write content to a file |
+| `str_replace` | `file:write` | Perform string replacement edits in a file |
+| `bash` | `bash` | Execute shell commands |
+
+## Web Search Configuration
+
+Configure the `web_search` tool in the `tools` section. DeerFlow supports multiple search providers — choose the one that best fits your use case and API access.
+
+```yaml
+tools:
+  - name: web_search
+    group: web
+    use: deerflow.community.tavily.tools:web_search_tool
+    max_results: 5
+    # api_key: $TAVILY_API_KEY  # Can also be set via env var
+```
+
+<Accordion title="Supported search providers">
+
+| Provider | `use` value | Key variable |
+|---|---|---|
+| **Tavily** (recommended) | `deerflow.community.tavily.tools:web_search_tool` | `TAVILY_API_KEY` |
+| Jina AI | `deerflow.community.jina.tools:web_search_tool` | `JINA_API_KEY` |
+| DuckDuckGo | `deerflow.community.duckduckgo.tools:web_search_tool` | *(none required)* |
+| Crawl4AI | `deerflow.community.crawl4ai.tools:web_search_tool` | *(none required)* |
+| Firecrawl | `deerflow.community.firecrawl.tools:web_search_tool` | `FIRECRAWL_API_KEY` |
+| fastCRW | `deerflow.community.fastcrw.tools:web_search_tool` | *(contact provider)* |
+| GroundRoute | `deerflow.community.groundroute.tools:web_search_tool` | `GROUNDROUTE_API_KEY` |
+
+Tavily is recommended for production use because of its high-quality snippets and reliable rate limits. DuckDuckGo and Crawl4AI require no API key and are useful for local development or low-volume use.
+
+</Accordion>
+
+## Browserless Web Capture
+
+The `web_capture` tool renders a page in a real browser and saves a screenshot as an artifact. It requires a running [Browserless](https://www.browserless.io/) instance.
+
+**Configure the tool:**
+
+```yaml
+tools:
+  - name: web_capture
+    group: web
+    use: deerflow.community.browserless.tools:web_capture_tool
+    base_url: http://localhost:3032
+    # token: $BROWSERLESS_TOKEN
+    output_format: png
+    full_page: true
+    viewport_width: 1280
+    viewport_height: 720
+```
+
+**Run Browserless locally with Docker:**
+
+```shell
+docker run -d \
+  --name browserless \
+  -p 3032:3000 \
+  -e "TOKEN=local-dev-token" \
+  ghcr.io/browserless/chromium
+```
+
+Then export the matching token so the tool can authenticate:
+
+```shell
+export BROWSERLESS_TOKEN=local-dev-token
+```
+
+Verify the instance is reachable before enabling the tool:
+
+```shell
+curl -sS "http://localhost:3032/screenshot?token=local-dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "options": {"type": "png"}}' \
+  -o /tmp/browserless-check.png
+```
+
+<Note>
+  For Docker Compose deployments, run Browserless as a sidecar service and set `base_url` to the service name (for example `http://browserless:3000`) instead of `localhost`. See the [Browserless project](https://github.com/browserless/browserless) for full deployment options.
+
+  By default, `web_capture` refuses URLs that resolve to private, loopback, link-local, or cloud-metadata addresses. Set `allow_private_addresses: true` only when you intentionally point the tool at an internal target.
+</Note>
+
+## Brave Image Search
+
+The `image_search` tool can use the Brave Search API to find reference images. Set up your API key and configure the tool:
+
+```yaml
+tools:
+  - name: image_search
+    group: web
+    use: deerflow.community.brave.tools:image_search_tool
+    # api_key: $BRAVE_SEARCH_API_KEY
+```
+
+Export your Brave Search API key:
+
+```shell
+export BRAVE_SEARCH_API_KEY=your-brave-search-api-key
+```
+
+## Managing Tools at Runtime
+
+You can enable, disable, and reconfigure most tools without editing `config.yaml` by hand:
+
+- **Web UI**: Open **Settings → Tools** to toggle individual tools and MCP servers. Changes take effect immediately and are written atomically to `extensions_config.json`.
+- **API**: Use the DeerFlow REST API to update tool and skill states programmatically.
+
+<Tip>
+  Tool toggles in the web UI update `extensions_config.json`, not `config.yaml`. Provider settings (API keys, `base_url`, `max_results`, etc.) must still be changed in `config.yaml` and require a service restart to take effect.
+</Tip>

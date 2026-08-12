@@ -1,0 +1,155 @@
+---
+title: "DeerFlow Sandbox: Isolated Code Execution Environments"
+sidebarTitle: "Sandbox"
+description: "DeerFlow runs agent code in isolated sandboxes. Learn about available providers — Local, Docker, E2B, BoxLite, and Kubernetes — and how to choose the right one."
+---
+
+DeerFlow gives the Lead Agent the ability to write and execute code, manage files, and run shell commands — but not on your host system directly. All agent execution happens inside a configurable sandbox environment that is isolated per conversation thread. The right sandbox provider depends on your security requirements, deployment target, and infrastructure.
+
+## What Is the Sandbox?
+
+The sandbox is an isolated execution environment that the agent acquires at the start of each turn. Every conversation thread gets its own sandbox context: separate filesystem directories, a distinct working directory, and no access to other users' data.
+
+Inside the sandbox, the agent operates through virtual paths that DeerFlow maps to thread-specific physical locations:
+
+| Virtual Path | Purpose |
+|---|---|
+| `/mnt/user-data/workspace` | Thread working directory — files the agent creates and modifies |
+| `/mnt/user-data/uploads` | Files you uploaded to this thread |
+| `/mnt/user-data/outputs` | Agent output files, served as downloadable artifacts |
+| `/mnt/skills` | Enabled skills (read-only) |
+
+The agent uses these virtual paths in its tool calls. DeerFlow translates them to the appropriate physical paths transparently, so the agent never needs to know where data actually lives on disk.
+
+**Tools available inside the sandbox:**
+
+- `bash` — run shell commands (disabled by default in Local mode)
+- `ls` — list directory contents
+- `read_file` — read file contents
+- `write_file` — write or append to files
+- `str_replace` — atomic string replacement in files
+
+## Sandbox Providers
+
+DeerFlow ships with five sandbox providers. You configure the active provider in `config.yaml` under the `sandbox` section.
+
+| Provider | Isolation | Best For |
+|---|---|---|
+| Local | Low (same process) | Development and fully trusted single-user environments |
+| Docker (AioSandbox) | Medium (Docker containers via DooD) | General use with stronger isolation than local |
+| BoxLite | High (micro-VM) | Production single-node deployments |
+| E2B Cloud | High (cloud sandbox) | Cloud deployments without local Docker |
+| Kubernetes (Provisioner) | Highest (K8s pods) | Production multi-tenant and internet-exposed deployments |
+
+<Accordion title="Local Sandbox">
+Commands run directly inside the Gateway container (or on the host process in local dev mode). There is no strong execution boundary.
+
+```yaml
+sandbox:
+  use: deerflow.sandbox.local:LocalSandboxProvider
+  allow_host_bash: false
+```
+
+`allow_host_bash` is `false` by default. Only enable it for fully trusted, single-user local workflows.
+</Accordion>
+
+<Accordion title="Docker Sandbox (AioSandbox)">
+Agent code runs in isolated Docker containers. This mode requires Docker and uses Docker-outside-of-Docker (DooD), which mounts the host Docker socket into the Gateway container.
+
+```yaml
+sandbox:
+  use: deerflow.community.aio_sandbox:AioSandboxProvider
+  port: 8080
+  auto_start: true
+  container_prefix: deer-flow-sandbox
+```
+
+DeerFlow pre-pulls the sandbox image with `make docker-init` and reuses warm containers across turns.
+</Accordion>
+
+<Accordion title="BoxLite Micro-VM">
+Each thread gets a lightweight OCI micro-VM. Boxes are warmed between turns and reused by the same thread on the next acquire. Install the optional dependency first:
+
+```bash
+pip install "deerflow-harness[boxlite]"
+```
+
+```yaml
+sandbox:
+  use: deerflow.community.boxlite:BoxliteProvider
+  image: python:3.12-slim
+  memory_mib: 1024
+  cpus: 2
+  replicas: 3
+  idle_timeout: 600
+```
+</Accordion>
+
+<Accordion title="E2B Cloud Sandbox">
+Sandboxes run as cloud micro-VMs managed by [E2B](https://e2b.dev). No local Docker required. `e2b-code-interpreter` is bundled as a core dependency — just provide your API key.
+
+```yaml
+sandbox:
+  use: deerflow.community.e2b_sandbox:E2BSandboxProvider
+  api_key: $E2B_API_KEY
+  template: code-interpreter-v1
+  idle_timeout: 600
+  replicas: 3
+```
+</Accordion>
+
+<Accordion title="Kubernetes via Provisioner">
+Each sandbox runs in an isolated Kubernetes Pod managed by the DeerFlow Provisioner service. This is the strongest isolation mode and is recommended for multi-tenant or internet-exposed deployments.
+
+```yaml
+sandbox:
+  use: deerflow.community.aio_sandbox:AioSandboxProvider
+  provisioner_url: http://provisioner:8002
+```
+
+The Provisioner starts automatically when `make docker-start` detects this configuration. See the Provisioner Setup Guide for cluster prerequisites.
+</Accordion>
+
+## Custom Sandbox Image
+
+If your workflows require packages not present in the default AIO sandbox image, you can extend it with a custom `Dockerfile`. Keep the upstream startup command intact — only add dependencies on top.
+
+```dockerfile
+FROM enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
+
+USER root
+
+# Add system packages
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends graphviz \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Python packages
+RUN python -m pip install --no-cache-dir pandas matplotlib
+
+# Do NOT override ENTRYPOINT or CMD
+```
+
+Point DeerFlow at your custom image in `config.yaml`:
+
+```yaml
+sandbox:
+  use: deerflow.community.aio_sandbox:AioSandboxProvider
+  image: your-registry/your-aio-sandbox:tag
+```
+
+<Note>
+In Kubernetes Provisioner mode, sandbox pods are created by the Provisioner service, not the Gateway. Set the `SANDBOX_IMAGE` environment variable on the Provisioner instead of using `sandbox.image` in `config.yaml`.
+</Note>
+
+## Security Considerations
+
+<Warning>
+**Local mode** runs agent code inside the Gateway container with no strong execution boundary. It is not suitable for untrusted workloads or multi-user environments.
+
+**Docker DooD mode** mounts the host Docker socket into the Gateway container. Anything that can reach that socket has root-equivalent control of the host. DeerFlow does **not** mount the Docker socket by default — it is added only via an opt-in Compose overlay when you configure Docker sandbox mode. If you must use DooD, treat the host as part of the Gateway's trust boundary.
+
+**Kubernetes Provisioner mode** offers the strongest isolation: sandbox pods run in K8s with no host socket exposure. Use it for any deployment that accepts traffic from untrusted users.
+</Warning>
+
+For setup instructions and provider-specific options, see the [Configuration Guide](/configuration/sandbox).

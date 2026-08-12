@@ -1,0 +1,212 @@
+---
+title: "Installing DeerFlow for Development and Production"
+sidebarTitle: "Installation"
+description: "Detailed installation guide for DeerFlow covering Docker, local development, and production server setups with all prerequisite checks."
+---
+
+DeerFlow supports three primary deployment modes: Docker-based development (recommended for most users), local development with hot-reload, and a production Docker stack for long-running shared deployments. This guide covers all three modes in detail, including system requirements, the setup wizard, startup commands, and config file locations.
+
+## System Requirements
+
+Before you start, confirm that your environment meets the following prerequisites:
+
+| Requirement | Minimum | Notes |
+|---|---|---|
+| CPU | 4 vCPU | 8+ vCPU recommended for Docker or server deployments |
+| RAM | 8 GB | 16+ GB recommended; 4 GB environments often fail to start |
+| Free disk | 20 GB SSD | 25–40 GB for Docker or server deployments |
+| Docker | Engine or Desktop | Required for Docker deployment mode |
+| Node.js | 22+ | Required for local development mode |
+| pnpm | Latest | Required for local development mode |
+| uv | Latest | Python package manager; required for local development mode |
+| nginx | Any recent | Local reverse proxy; required for local development mode |
+| OS | Linux / macOS | Windows supported only via Git Bash (not `cmd.exe` or PowerShell) |
+
+<Warning>
+  Environments with only 2 vCPU or 4 GB of RAM often fail to start reliably. If you are on a resource-constrained machine, use hosted model APIs to keep local overhead low, and prefer the Docker deployment path.
+</Warning>
+
+Linux with Docker is the recommended deployment target for persistent server installations. macOS and Windows are best treated as development or evaluation environments.
+
+## Setup Wizard
+
+The fastest way to get a valid configuration is to run `make setup` from the project root after cloning the repository:
+
+```shell
+git clone https://github.com/bytedance/deer-flow.git
+cd deer-flow
+make setup
+```
+
+The interactive wizard guides you through:
+
+- Choosing an LLM provider and entering your API keys
+- Optionally configuring a web search provider (Tavily, SearXNG, etc.)
+- Selecting a sandbox execution mode (Local, Docker, E2B, BoxLite, Kubernetes)
+- Setting bash access and file-write tool policies
+
+After completion, the wizard writes a minimal `config.yaml` to the project root and saves your API keys to `.env`. The whole process takes about two minutes.
+
+<Tip>
+  Run `make doctor` at any time to verify your setup and get actionable fix hints. If you are opening a GitHub issue about a local setup or runtime problem, run `make support-bundle` to generate a redacted diagnostics summary you can paste directly into the issue.
+</Tip>
+
+If you prefer full manual control, run `make config` instead of `make setup` to copy the complete `config.example.yaml` template to `config.yaml`, then edit it directly. See `config.example.yaml` for the complete reference, including CLI-backed providers, OpenRouter, the Responses API, and sub-agent runtime caps.
+
+## Startup Modes
+
+DeerFlow runs the agent runtime inside the Gateway API. Choose a startup mode based on your use case:
+
+| Mode | Command | Access URL |
+|---|---|---|
+| Docker dev (hot-reload) | `make docker-start` | http://localhost:2026 |
+| Docker prod (built images) | `make up` | http://localhost:2026 |
+| Local dev (foreground) | `make dev` | http://localhost:2026 |
+| Local prod (foreground) | `make start` | http://localhost:2026 |
+
+You can also run services as background daemons using the underlying scripts:
+
+```shell
+# Local daemon mode
+./scripts/serve.sh --dev --daemon     # development daemon
+./scripts/serve.sh --prod --daemon    # production daemon
+
+# Stop / restart
+make stop
+./scripts/serve.sh --restart --dev
+```
+
+## Docker Setup
+
+Docker is the recommended path for most users because it handles dependency isolation and provides a closer approximation of a production environment.
+
+### Development (Hot-Reload)
+
+```shell
+# Pull the sandbox image (once, or when the image is updated)
+make docker-init
+
+# Start all services (auto-detects sandbox mode from config.yaml)
+make docker-start
+
+# Tail container logs
+make docker-logs
+
+# Stop all services
+make docker-stop
+```
+
+<Note>
+  `make docker-start` starts the `provisioner` service only when `config.yaml` is configured for provisioner mode. In Local or standard Docker mode, the provisioner is not started.
+</Note>
+
+If your Docker builds feel slow on restricted networks, you can point `uv` and npm at mirror registries before running `make docker-init`:
+
+```shell
+export UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+export NPM_REGISTRY=https://registry.npmmirror.com
+make docker-init
+```
+
+### Production
+
+The production stack builds images locally and mounts runtime config and data directories:
+
+```shell
+# Build all images and start services in one step
+make up
+
+# Or build and start separately
+./scripts/deploy.sh build
+./scripts/deploy.sh start
+
+# Stop and remove containers
+make down
+```
+
+<Warning>
+  For production deployments, configure a durable database backend in `config.yaml` (`database.backend: sqlite` or `database.backend: postgres`). The default in-memory store does not persist data across restarts.
+</Warning>
+
+By default, the Docker stack binds its entry port on `127.0.0.1` only, matching the local-trusted-environment model. To expose DeerFlow to another machine, set `BIND_HOST=0.0.0.0` in `.env` — and only after putting appropriate network security controls in place.
+
+**Complete first-run setup before the host becomes reachable.** A fresh DeerFlow instance has no accounts yet. Navigate to `/setup` immediately after starting any non-loopback deployment to create the admin account.
+
+## Local Development Setup
+
+Use this path if you want to run DeerFlow's backend and frontend services directly on your host machine, without Docker.
+
+<Steps>
+  <Step title="Check prerequisites">
+    ```shell
+    make check
+    ```
+
+    This verifies that Node.js 22+, pnpm, uv, and nginx are all available. If any tool is missing, install it before continuing. DeerFlow does not install system packages automatically.
+  </Step>
+  <Step title="Install dependencies">
+    ```shell
+    make install
+    ```
+
+    This installs backend Python dependencies, frontend Node.js packages, and pre-commit hooks.
+  </Step>
+  <Step title="(Optional) Pull the sandbox image">
+    If you are using a Docker or container-based sandbox, pre-pull the image now:
+
+    ```shell
+    make setup-sandbox
+    ```
+  </Step>
+  <Step title="Start services">
+    ```shell
+    make dev
+    ```
+
+    This starts the backend API server, the frontend development server, and the nginx proxy in the foreground with hot-reload enabled. Press `Ctrl+C` to stop everything.
+  </Step>
+  <Step title="Open the web interface">
+    Navigate to [http://localhost:2026](http://localhost:2026) in your browser.
+  </Step>
+</Steps>
+
+<Note>
+  On Windows, run the local development flow from Git Bash. Native `cmd.exe` and PowerShell are not supported for the bash-based service scripts.
+</Note>
+
+## Configuration Files
+
+DeerFlow uses two configuration files in the project root:
+
+**`config.yaml`** — the main runtime configuration. It controls models, sandbox mode, memory backend, scheduled tasks, database backend, and more.
+
+```shell
+# Create from the full template (manual configuration)
+make config
+
+# Upgrade an existing config to add new fields
+make config-upgrade
+```
+
+**`extensions_config.json`** — MCP server definitions and per-skill enabled states. This file is updated automatically when you use **Settings → Tools** in the web UI, but you can also edit it directly.
+
+```shell
+# Create from the example template
+cp extensions_config.example.json extensions_config.json
+```
+
+Both files are live-reloaded by the backend on config access, so most changes take effect without a restart. The exceptions are `database.checkpoint_channel_mode` and `database.checkpoint_delta.snapshot_frequency`, which are frozen when the process first builds an agent and require a process restart to change safely.
+
+## One-Line Agent Setup
+
+If you use Claude Code, Codex, Cursor, Windsurf, or another coding agent, you can bootstrap DeerFlow with a single instruction:
+
+```text
+Help me clone DeerFlow if needed, then bootstrap it for local development by following https://raw.githubusercontent.com/bytedance/deer-flow/main/Install.md
+```
+
+The coding agent will clone the repository, detect whether Docker is available, prepare prerequisites, and report the exact next command to launch DeerFlow — plus any missing API keys you still need to provide.
+
+## Next Steps
+
+See the [Configuration overview](/configuration/overview) for a full reference of every `config.yaml` section, including models, sandbox providers, memory backends, MCP servers, IM channels, and authorization settings.

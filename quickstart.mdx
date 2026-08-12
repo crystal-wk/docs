@@ -1,47 +1,201 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with DeerFlow in Minutes"
+sidebarTitle: "Quickstart"
+description: "Set up and run DeerFlow locally using Docker or a local environment. Includes model configuration and first agent conversation steps."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+DeerFlow is designed to be running in under five minutes on any modern laptop or server. This guide walks you through cloning the repository, configuring a model provider, and opening your first agent conversation. If you need a deeper reference — including production server setup, nginx configuration, and database backends — see the [Installation guide](/installation).
 
 ## Prerequisites
 
-Before you begin, you must have:
+Choose one of the two deployment paths below and make sure the listed tools are available on your machine before you start.
 
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
+<CardGroup cols={2}>
+  <Card title="Docker (Recommended)" icon="docker">
+    - **Docker Desktop** or Docker Engine with the daemon running
+    - At least 4 vCPU and 8 GB RAM available to Docker
+  </Card>
+  <Card title="Local Development" icon="laptop-code">
+    - **Node.js 22+** and **pnpm**
+    - **uv** (Python package manager)
+    - **nginx** (used as a local reverse proxy)
+  </Card>
+</CardGroup>
 
-## Get started
+## Deployment Sizing
 
-<Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+Use the table below as a practical guide before choosing how to run DeerFlow. The numbers cover DeerFlow itself — size any locally hosted LLM separately.
 
-    ```bash
-    npm install your-package
-    ```
-  </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+| Target | Starting Point | Recommended |
+|---|---|---|
+| Local — `make dev` | 4 vCPU, 8 GB RAM, 20 GB SSD | 8 vCPU, 16 GB RAM |
+| Docker — `make docker-start` | 4 vCPU, 8 GB RAM, 25 GB SSD | 8 vCPU, 16 GB RAM |
+| Server — `make up` | 8 vCPU, 16 GB RAM, 40 GB SSD | 16 vCPU, 32 GB RAM |
 
-    ```bash
-    your-cli init
-    ```
-  </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+<Warning>
+  Environments with only 2 vCPU or 4 GB of RAM often fail to start reliably. If you're on a resource-constrained machine, use the hosted model APIs (OpenAI, Anthropic, DeepSeek) to keep local overhead low.
+</Warning>
 
-    ```bash
-    your-cli start
-    ```
-  </Step>
-</Steps>
+## Installation
+
+<Tabs>
+  <Tab title="Docker (Recommended)">
+    <Steps>
+      <Step title="Clone the repository">
+        ```shell
+        git clone https://github.com/bytedance/deer-flow.git
+        cd deer-flow
+        ```
+      </Step>
+      <Step title="Run the setup wizard">
+        The interactive wizard guides you through choosing an LLM provider, optional web search, and sandbox preferences. It generates `config.yaml` and writes your API keys to `.env`. The whole process takes about two minutes.
+
+        ```shell
+        make setup
+        ```
+
+        If you prefer to edit `config.yaml` manually, run `make config` instead to copy the full template.
+      </Step>
+      <Step title="Pull the sandbox image">
+        This step downloads the Docker sandbox image. You only need to run it once, or again when the image is updated.
+
+        ```shell
+        make docker-init
+        ```
+      </Step>
+      <Step title="Start DeerFlow">
+        ```shell
+        make docker-start
+        ```
+
+        This command starts all services and auto-detects the sandbox mode from your `config.yaml`.
+      </Step>
+      <Step title="Open the web interface">
+        Navigate to [http://localhost:2026](http://localhost:2026) in your browser. The first time you open DeerFlow, you'll be prompted to create an admin account.
+      </Step>
+    </Steps>
+
+    <Tip>
+      Use `make docker-logs` to tail the container logs, and `make docker-stop` to shut everything down cleanly.
+    </Tip>
+  </Tab>
+  <Tab title="Local Development">
+    <Steps>
+      <Step title="Clone the repository">
+        ```shell
+        git clone https://github.com/bytedance/deer-flow.git
+        cd deer-flow
+        ```
+      </Step>
+      <Step title="Run the setup wizard">
+        ```shell
+        make setup
+        ```
+      </Step>
+      <Step title="Verify prerequisites">
+        ```shell
+        make check
+        ```
+
+        This confirms that Node.js 22+, pnpm, uv, and nginx are all available. If any tool is missing, install it before continuing — DeerFlow does not install system packages automatically.
+      </Step>
+      <Step title="Install dependencies">
+        ```shell
+        make install
+        ```
+
+        This installs backend Python dependencies, frontend Node.js packages, and pre-commit hooks.
+      </Step>
+      <Step title="Start DeerFlow">
+        ```shell
+        make dev
+        ```
+
+        This starts all services in the foreground with hot-reload enabled.
+      </Step>
+      <Step title="Open the web interface">
+        Navigate to [http://localhost:2026](http://localhost:2026) in your browser.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Configure Your Model
+
+The setup wizard creates a minimal `config.yaml` in your project root. You can always edit it directly to add more providers or adjust settings. Here are a few common examples:
+
+<CodeGroup>
+  ```yaml OpenAI (GPT-4o)
+  models:
+    - name: gpt-4o
+      display_name: GPT-4o
+      use: langchain_openai:ChatOpenAI
+      model: gpt-4o
+      api_key: $OPENAI_API_KEY
+  ```
+
+  ```yaml Anthropic (Claude)
+  models:
+    - name: claude-sonnet-4-6
+      display_name: Claude Sonnet 4.6
+      use: langchain_anthropic:ChatAnthropic
+      model: claude-sonnet-4-6-20251101
+      api_key: $ANTHROPIC_API_KEY
+      max_tokens: 16000
+  ```
+
+  ```yaml DeepSeek
+  models:
+    - name: deepseek-chat
+      display_name: DeepSeek Chat
+      use: langchain_deepseek:ChatDeepSeek
+      model: deepseek-chat
+      api_key: $DEEPSEEK_API_KEY
+  ```
+
+  ```yaml OpenRouter (any model)
+  models:
+    - name: openrouter-gemini-2.5-flash
+      display_name: Gemini 2.5 Flash (OpenRouter)
+      use: langchain_openai:ChatOpenAI
+      model: google/gemini-2.5-flash-preview
+      api_key: $OPENROUTER_API_KEY
+      base_url: https://openrouter.ai/api/v1
+  ```
+</CodeGroup>
+
+<Note>
+  Run `make config-upgrade` if DeerFlow warns that your `config.yaml` is outdated. It merges any new fields while preserving your existing values and creates a `.bak` backup.
+</Note>
+
+## API Keys
+
+Store your API keys in the `.env` file in the project root. The setup wizard creates this file for you, but you can add keys manually at any time:
+
+```shell .env
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+DEEPSEEK_API_KEY=sk-...
+TAVILY_API_KEY=tvly-...     # optional: web search
+```
+
+DeerFlow reads `.env` automatically on startup. You never need to export these variables to your shell.
+
+## Your First Conversation
+
+Once DeerFlow is running at [http://localhost:2026](http://localhost:2026):
+
+1. Create your admin account when prompted on first launch.
+2. Select a model from the model picker in the top bar.
+3. Type a message in the composer and press **Enter** (or click **Send**).
+4. Watch the agent think, search the web, and write code in real time.
+
+Try starting with a research question like _"Summarize the latest developments in quantum computing"_ or a coding task like _"Write a Python script that scrapes Hacker News headlines and ranks them by points."_
 
 <Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
-
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+  Run `make doctor` at any time to verify your configuration and get actionable fix hints. If you're opening a GitHub issue about a setup problem, run `make support-bundle` first — it generates a redacted diagnostics summary you can paste directly into the issue.
 </Tip>
+
+## Next Steps
+
+For detailed installation options — including production server setup, Postgres configuration, and multi-worker deployments — see the [Installation guide](/installation).

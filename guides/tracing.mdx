@@ -1,0 +1,108 @@
+---
+title: "Enable Tracing and Observability in DeerFlow"
+sidebarTitle: "Tracing"
+description: "Instrument DeerFlow with LangSmith, Langfuse, or Monocle for end-to-end agent observability, trace correlation, and performance monitoring."
+---
+
+DeerFlow integrates with LangSmith, Langfuse, and Monocle for agent observability. All three providers can run simultaneously — set the appropriate environment variables in your `.env` file and restart the Gateway. No code changes are required.
+
+## LangSmith
+
+[LangSmith](https://smith.langchain.com) provides full LangGraph trace visualization, tool call details, and latency breakdowns for every agent run.
+
+Set the following environment variables to enable LangSmith tracing:
+
+```shell
+export LANGSMITH_TRACING=true
+export LANGSMITH_API_KEY=your-api-key
+export LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+export LANGSMITH_PROJECT=my-deerflow-project
+```
+
+Once enabled, every LLM call, agent run, and tool execution appears in your LangSmith dashboard under the configured project. You can inspect individual steps, view token usage, and drill into tool call inputs and outputs.
+
+## Langfuse
+
+[Langfuse](https://langfuse.com) provides LangChain-compatible observability with automatic session and user correlation.
+
+Set the following environment variables to enable Langfuse tracing:
+
+```shell
+export LANGFUSE_TRACING=true
+export LANGFUSE_PUBLIC_KEY=your-public-key
+export LANGFUSE_SECRET_KEY=your-secret-key
+export LANGFUSE_BASE_URL=https://cloud.langfuse.com
+```
+
+DeerFlow annotates every agent run with Langfuse's reserved trace attributes so the Sessions and Users pages populate automatically:
+
+| Attribute | Value |
+|---|---|
+| `session_id` | LangGraph `thread_id` — groups all traces for the same conversation |
+| `user_id` | Effective user from `get_effective_user_id()` (falls back to `default` in no-auth mode) |
+| `trace_name` | Assistant ID (defaults to `lead-agent`) |
+| `tags` | `[env:<DEER_FLOW_ENV>, model:<model_name>]` (omitted when not set) |
+| `metadata.deerflow_trace_id` | DeerFlow request correlation ID, matching `X-Trace-Id` in HTTP responses |
+
+### Self-Hosted Langfuse
+
+If you run a self-hosted Langfuse instance, change `LANGFUSE_BASE_URL` to point at your server:
+
+```shell
+export LANGFUSE_BASE_URL=https://langfuse.your-domain.com
+```
+
+## Monocle
+
+[Monocle](https://github.com/monocle2ai/monocle) is an OpenTelemetry-based tracer for agentic applications. It records each run end-to-end, including LLM calls, agent steps, tool invocations, and MCP calls, with their inputs, outputs, timings, and token counts.
+
+Set the following environment variables to enable Monocle tracing:
+
+```shell
+export MONOCLE_TRACING=true
+export MONOCLE_EXPORTERS=file   # file, console, okahu, s3, blob, gcs (default: file)
+```
+
+Each run writes one trace file to `.monocle/`. Open the file in the [Monocle VS Code extension](https://marketplace.visualstudio.com/items?itemName=OkahuAI.monocle-apptrace) to inspect the span timeline and token counts.
+
+To send traces to [Okahu](https://www.okahu.ai) for cross-run analysis and agentic evaluations, set the `okahu` exporter and provide your API key:
+
+```shell
+export MONOCLE_EXPORTERS=okahu
+export OKAHU_API_KEY=okh_xxxxxxxx
+```
+
+## Running Multiple Providers Simultaneously
+
+LangSmith and Langfuse attach as LangChain callbacks, so you can enable both and DeerFlow reports each run to both dashboards. Monocle uses a global OpenTelemetry provider — Langfuse shares that provider, so all three can run together.
+
+<Note>
+  If an enabled provider is missing required credentials or fails to initialize, DeerFlow fails fast at startup and names the provider that could not initialize. Check your environment variables if this happens.
+</Note>
+
+To run all three at once, set variables for each provider in your `.env`:
+
+```shell
+# LangSmith
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=your-langsmith-key
+LANGSMITH_PROJECT=my-deerflow-project
+
+# Langfuse
+LANGFUSE_TRACING=true
+LANGFUSE_PUBLIC_KEY=your-public-key
+LANGFUSE_SECRET_KEY=your-secret-key
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+
+# Monocle
+MONOCLE_TRACING=true
+MONOCLE_EXPORTERS=file
+```
+
+## Trace ID Correlation
+
+Every Gateway HTTP response includes an `X-Trace-Id` header, and DeerFlow logs include a `trace_id` field with the same value. When Langfuse tracing is enabled, the matching correlation ID also appears in `metadata.deerflow_trace_id` on each Langfuse trace. Use this ID to cross-reference a specific request across your logs, HTTP responses, and the Langfuse UI.
+
+<Tip>
+  Add all tracing variables to your `.env` file for always-on observability in development. For Docker deployments, tracing is disabled by default — add the variables to your Docker environment configuration to enable it.
+</Tip>

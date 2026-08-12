@@ -1,0 +1,146 @@
+---
+title: "DeerFlow Environment Variables Reference"
+sidebarTitle: "Environment Variables"
+description: "Complete reference for DeerFlow environment variables including API keys for LLM providers, search tools, sandbox credentials, and runtime configuration."
+---
+
+Environment variables let you supply secrets and runtime settings to DeerFlow without storing them directly in `config.yaml`. Keeping sensitive values out of your configuration file makes it safer to share configs, check templates into version control, and rotate credentials without editing YAML.
+
+## How to Set Environment Variables
+
+DeerFlow reads environment variables from two places:
+
+1. A `.env` file in the project root (recommended for local development and Docker deployments)
+2. Variables exported in your shell before starting the service
+
+Create or edit the `.env` file in your project root:
+
+```shell
+# .env
+OPENAI_API_KEY=sk-...
+TAVILY_API_KEY=tvly-...
+```
+
+Reference any environment variable in `config.yaml` with the `$` prefix:
+
+```yaml
+models:
+  - name: gpt-4o
+    api_key: $OPENAI_API_KEY   # DeerFlow substitutes the value at startup
+```
+
+DeerFlow substitutes variables at config-load time. If a referenced variable is not set, the field is left empty and DeerFlow logs a warning.
+
+## LLM Provider API Keys
+
+| Variable | Provider |
+|---|---|
+| `OPENAI_API_KEY` | OpenAI |
+| `ANTHROPIC_API_KEY` | Anthropic |
+| `DEEPSEEK_API_KEY` | DeepSeek |
+| `MIMO_API_KEY` | Xiaomi MiMo |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth (preferred over file-based auth) |
+| `ANTHROPIC_AUTH_TOKEN` | Anthropic alternative auth token |
+| `CODEX_AUTH_PATH` | Path to a Codex CLI `auth.json` file |
+
+## Search & Web Tools
+
+| Variable | Tool |
+|---|---|
+| `TAVILY_API_KEY` | Tavily search |
+| `BRAVE_SEARCH_API_KEY` | Brave Search (`web_search` and `image_search`) |
+| `GROUNDROUTE_API_KEY` | GroundRoute meta-search (`web_search` and `web_fetch`) |
+| `BROWSERLESS_TOKEN` | Browserless Cloud token for `web_capture` |
+| `SERPER_API_KEY` | Serper Google Search/Images API |
+| `JINA_API_KEY` | Jina AI |
+| `FIRECRAWL_API_KEY` | Firecrawl |
+
+## IM Channels
+
+| Variable | Channel |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | Telegram |
+| `SLACK_BOT_TOKEN` | Slack bot token |
+| `SLACK_APP_TOKEN` | Slack Socket Mode app token |
+| `DISCORD_BOT_TOKEN` | Discord |
+| `FEISHU_APP_ID` | Feishu / Lark app ID |
+| `FEISHU_APP_SECRET` | Feishu / Lark app secret |
+| `DINGTALK_CLIENT_ID` | DingTalk client ID |
+| `DINGTALK_CLIENT_SECRET` | DingTalk client secret |
+| `WECHAT_BOT_TOKEN` | WeChat bot token |
+| `WECOM_BOT_ID` | WeCom bot ID |
+| `WECOM_BOT_SECRET` | WeCom bot secret |
+
+## Sandbox
+
+| Variable | Purpose |
+|---|---|
+| `E2B_API_KEY` | E2B Cloud sandbox API key |
+
+## Observability & Tracing
+
+<Tabs>
+  <Tab title="LangSmith">
+    | Variable | Purpose |
+    |---|---|
+    | `LANGSMITH_API_KEY` | LangSmith API key |
+    | `LANGSMITH_PROJECT` | LangSmith project name |
+    | `LANGSMITH_TRACING` | Set to `true` to enable LangSmith tracing |
+    | `LANGSMITH_ENDPOINT` | LangSmith endpoint URL (default: `https://api.smith.langchain.com`) |
+  </Tab>
+  <Tab title="Langfuse">
+    | Variable | Purpose |
+    |---|---|
+    | `LANGFUSE_PUBLIC_KEY` | Langfuse public key |
+    | `LANGFUSE_SECRET_KEY` | Langfuse secret key |
+    | `LANGFUSE_BASE_URL` | Langfuse server URL (for self-hosted instances) |
+    | `LANGFUSE_TRACING` | Set to `true` to enable Langfuse tracing |
+  </Tab>
+</Tabs>
+
+## Runtime Paths
+
+| Variable | Purpose |
+|---|---|
+| `DEER_FLOW_CONFIG_PATH` | Absolute path to a custom `config.yaml` file |
+| `DEER_FLOW_EXTENSIONS_CONFIG_PATH` | Absolute path to a custom `extensions_config.json` file |
+| `DEER_FLOW_HOME` | Runtime state directory (defaults to `.deer-flow` under the project root) |
+| `DEER_FLOW_PROJECT_ROOT` | Project root directory for resolving relative runtime paths |
+| `DEER_FLOW_SKILLS_PATH` | Skills directory path (overrides `skills.path` in `config.yaml`) |
+
+## Example `.env` File
+
+The following is a representative `.env` file covering the most common variables:
+
+```shell
+# ── LLM Providers ───────────────────────────────────────────────────────────
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+DEEPSEEK_API_KEY=...
+
+# ── Web Search ───────────────────────────────────────────────────────────────
+TAVILY_API_KEY=tvly-...
+BRAVE_SEARCH_API_KEY=...
+
+# ── Sandbox ──────────────────────────────────────────────────────────────────
+E2B_API_KEY=...
+
+# ── IM Channels ──────────────────────────────────────────────────────────────
+TELEGRAM_BOT_TOKEN=...
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_APP_TOKEN=xapp-...
+
+# ── Observability ────────────────────────────────────────────────────────────
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=ls__...
+LANGSMITH_PROJECT=deer-flow
+
+# ── Runtime Paths (override only when needed) ────────────────────────────────
+# DEER_FLOW_PROJECT_ROOT=/path/to/deer-flow
+# DEER_FLOW_CONFIG_PATH=/path/to/config.yaml
+# DEER_FLOW_HOME=/path/to/.deer-flow
+```
+
+<Tip>
+  Run `make doctor` at any time to verify that all required variables are set and that DeerFlow can reach your configured providers. The command prints actionable fix hints for any missing or misconfigured values.
+</Tip>

@@ -1,0 +1,99 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "DeerFlow",
+  "projectDescription": "DeerFlow is an open-source AI super-agent harness that orchestrates sub-agents, persistent memory, and sandboxed execution through extensible skills — powered by LangGraph.",
+  "theme": "luma",
+  "primaryColor": "#848c8e",
+  "lightColor": "#11161e",
+  "darkColor": "#cfd0d2",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/agents",
+              "concepts/skills",
+              "concepts/memory",
+              "concepts/sandbox"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/overview",
+              "configuration/models",
+              "configuration/tools",
+              "configuration/sandbox",
+              "configuration/environment-variables"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/mcp-server",
+              "guides/im-channels",
+              "guides/scheduled-tasks",
+              "guides/tracing",
+              "guides/tui"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/python-client",
+              "reference/rest-api",
+              "reference/context-modes",
+              "reference/troubleshooting"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-agent orchestration with sub-agent delegation and fan-out",
+    "Sandboxed code execution (Local, Docker, E2B, BoxLite, Kubernetes)",
+    "Extensible skill system with per-user custom skills",
+    "Long-term memory with pluggable backends (DeerMem, mem0)",
+    "Model Context Protocol (MCP) server integration",
+    "IM channel connections (Telegram, Slack, Discord, Feishu, DingTalk, WeCom)",
+    "Embedded Python client and terminal workbench (TUI)",
+    "Scheduled tasks (cron and one-time) with thread reuse",
+    "Structured tracing via LangSmith, Langfuse, and Monocle",
+    "Support for OpenAI, Anthropic, DeepSeek, Qwen, Claude Code, Codex CLI, and more"
+  ],
+  "publicApiSurface": [
+    "GET /api/models",
+    "GET /api/skills",
+    "PUT /api/skills/<skill_name>",
+    "GET /api/agents",
+    "GET /api/memory",
+    "POST /api/threads/{id}/uploads",
+    "GET /api/threads/{id}/uploads/list",
+    "DELETE /api/threads/{id}",
+    "GET /api/threads/{id}/artifacts/{path}",
+    "GET /api/mcp/config",
+    "PUT /api/mcp/config",
+    "GET /health",
+    "DeerFlowClient.chat()",
+    "DeerFlowClient.stream()",
+    "DeerFlowClient.list_models()",
+    "DeerFlowClient.list_skills()",
+    "DeerFlowClient.update_skill()",
+    "DeerFlowClient.upload_files()",
+    "DeerFlowClient.set_goal()",
+    "deerflow CLI (TUI launch, --print, --json, --resume)"
+  ]
+}

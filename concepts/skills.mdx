@@ -1,0 +1,151 @@
+---
+title: "DeerFlow Skills: Extensible Agent Capabilities"
+sidebarTitle: "Skills"
+description: "Skills extend DeerFlow agents with domain-specific workflows. Learn how to use public skills, create custom skills, and control skill access."
+---
+
+Skills are DeerFlow's extensibility layer. Instead of baking every specialized workflow into the core agent, DeerFlow lets you package domain-specific instructions, tool policies, and system-prompt snippets into self-contained skill directories. The agent discovers enabled skills automatically and gains their capabilities through system-prompt injection — no code changes required.
+
+## What Are Skills?
+
+A skill is a domain-specific workflow package that the agent loads at runtime. Each skill lives in a directory containing a `SKILL.md` file that defines the skill's name, description, activation instructions, and optional tool restrictions. When you enable a skill, DeerFlow injects the relevant parts of its `SKILL.md` into the Lead Agent's system prompt, giving it new instructions and behaviors for that domain.
+
+Skills are **not** standalone agents — they are capability overlays applied to the Lead Agent (or a sub-agent) through the prompt.
+
+### Skills Directory Structure
+
+```
+deer-flow/
+└── skills/
+    ├── public/       # Built-in skills, committed to the repo
+    └── custom/       # Your own skills, gitignored
+```
+
+DeerFlow recursively discovers all `SKILL.md` files under `skills/public/` and `skills/custom/`. Each immediate subdirectory with a `SKILL.md` is treated as one skill. Nested `SKILL.md` files inside a skill's own subdirectories are **not** treated as independent skills — they are part of the parent skill's content.
+
+## Using Skills
+
+### Activating a Skill
+
+Once a skill is enabled, you activate it in conversation with a slash command:
+
+```
+/<skill-name> <your task>
+```
+
+For example, to use a skill named `github-research`:
+
+```
+/github-research summarize the top open issues in langchain-ai/langgraph
+```
+
+### Enabling and Disabling Skills
+
+You can manage skill availability in two ways:
+
+<Tabs>
+  <Tab title="Web UI">
+    Go to **Settings → Tools** in the DeerFlow web interface. Each discovered skill appears as a toggle. Flip it on or off — changes take effect immediately without a restart.
+  </Tab>
+  <Tab title="API / Config">
+    Edit `extensions_config.json` in the project root:
+
+    ```json
+    {
+      "skills": {
+        "github-research": { "enabled": true },
+        "pdf-processing":  { "enabled": false }
+      }
+    }
+    ```
+
+    DeerFlow watches this file at runtime; API updates replace it atomically.
+  </Tab>
+</Tabs>
+
+## Built-in Public Skill Example
+
+DeerFlow ships with a `claude-to-deerflow` skill in `skills/public/`. This skill lets the agent interact with **another DeerFlow instance** via its HTTP API, enabling cross-instance delegation and research workflows. It serves as a reference example of how skills can wrap external service calls.
+
+## Creating Custom Skills
+
+<Steps>
+  <Step title="Create the skill directory">
+    Add a new directory under `skills/custom/`. The directory name becomes the skill's identifier.
+
+    ```
+    skills/
+    └── custom/
+        └── my-data-analysis/
+            └── SKILL.md
+    ```
+  </Step>
+  <Step title="Write the SKILL.md">
+    Define your skill's metadata and instructions in `SKILL.md`. At minimum include a name, description, and the workflow steps the agent should follow when this skill is active.
+  </Step>
+  <Step title="Enable the skill">
+    Add an entry to `extensions_config.json` or toggle it on in Settings → Tools:
+
+    ```json
+    {
+      "skills": {
+        "my-data-analysis": { "enabled": true }
+      }
+    }
+    ```
+  </Step>
+  <Step title="Activate in conversation">
+    Use the slash command to invoke it:
+
+    ```
+    /my-data-analysis analyze the attached CSV and produce a summary report
+    ```
+  </Step>
+</Steps>
+
+## Per-User Skill Isolation
+
+When running DeerFlow with multiple users, custom skills can be sandboxed on a per-user basis. Each user's skill context is isolated so one user's custom skills do not appear in another user's skill list.
+
+## Skill Allowed Tools
+
+A skill's `SKILL.md` can declare an `allowed-tools` policy that restricts which tools a sub-agent spawned by that skill may use. This is a security and scoping mechanism: a skill focused on read-only research can prevent its sub-agents from writing files or executing shell commands.
+
+<Warning>
+The `allowed-tools` policy is applied only **after** slash activation or after the agent completes a full `SKILL.md` read. It does not remove baseline tools from the Lead Agent itself — it scopes tools for delegated sub-agents spawned in the context of that skill.
+</Warning>
+
+## SkillScan
+
+SkillScan runs a static analysis pass over skill packages when they are installed or written by the agent. It checks for common issues before the LLM-based skill scanner runs.
+
+Enable it in `config.yaml`:
+
+```yaml
+skill_scan:
+  enabled: true
+```
+
+- **CRITICAL findings** block the install.
+- **Warning findings** are surfaced as context for the LLM scanner.
+
+Setting `skill_scan.enabled: false` disables only the deterministic analyzers. Safe archive extraction and the LLM-based scanner still run.
+
+## Skills Configuration in config.yaml
+
+You can override the default skills path and container mount path:
+
+```yaml
+skills:
+  path: /custom/path/to/skills
+  container_path: /mnt/skills
+```
+
+| Field | Default | Description |
+|---|---|---|
+| `path` | `skills/` under project root | Host path to the skills directory |
+| `container_path` | `/mnt/skills` | Mount path inside the sandbox container |
+
+<Note>
+Skills are mounted read-only at `/mnt/skills` inside the sandbox. The agent can read skill files but cannot modify them through the sandbox file tools.
+</Note>

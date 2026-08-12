@@ -1,0 +1,98 @@
+---
+title: "DeerFlow Context Modes: Flash, Standard, Pro, Ultra"
+sidebarTitle: "Context Modes"
+description: "Choose the right context mode for your DeerFlow task. Flash is fastest; Ultra enables full planning and multi-agent workflows for complex research tasks."
+---
+
+Context modes control how much reasoning and delegation DeerFlow applies to a request. Use faster modes for quick lookups and heavier modes for complex research or multi-step tasks. Each mode is a combination of three capabilities — thinking, planning, and sub-agent delegation — that you can also compose manually if you need a custom profile.
+
+## Modes at a Glance
+
+| Mode | Thinking | Planning | Sub-Agents | Best For |
+|---|---|---|---|---|
+| **Flash** | Off | Off | Off | Quick questions, simple lookups |
+| **Standard** | On | Off | Off | General tasks needing reasoning |
+| **Pro** | On | On | Off | Research tasks with structured planning |
+| **Ultra** | On | On | On | Complex multi-step research and delegation |
+
+## How to Set the Mode
+
+<Tabs>
+  <Tab title="Web UI">
+    Open the chat composer and use the mode selector at the bottom of the input area. Changes take effect on the next message you send.
+  </Tab>
+  <Tab title="Python Client">
+    Pass the three capability flags to `stream()` or `chat()`:
+
+    ```python
+    # Ultra mode
+    for event in client.stream(
+        "Research recent AI developments",
+        thread_id="research-1",
+        is_plan_mode=True,
+        thinking_enabled=True,
+        subagent_enabled=True,
+    ):
+        print(event)
+
+    # Flash mode
+    response = client.chat(
+        "What is the capital of France?",
+        thread_id="quick-1",
+        is_plan_mode=False,
+        thinking_enabled=False,
+        subagent_enabled=False,
+    )
+    ```
+  </Tab>
+  <Tab title="REST API">
+    Pass the flags in the `config.configurable` object of a streaming run request:
+
+    ```shell
+    curl -N -X POST http://localhost:2026/api/langgraph/threads/{thread_id}/runs/stream \
+      -H "Content-Type: application/json" \
+      -d '{
+        "assistant_id": "agent",
+        "input": {
+          "messages": [{"role": "human", "content": "Research quantum computing trends"}]
+        },
+        "config": {
+          "configurable": {
+            "thinking_enabled": true,
+            "is_plan_mode": true,
+            "subagent_enabled": true
+          }
+        }
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## What Each Capability Does
+
+**Thinking** enables extended reasoning before the agent produces its answer. The model works through the problem step-by-step internally before responding. Use this for technical, analytical, or ambiguous tasks where chain-of-thought improves accuracy.
+
+**Planning** makes the agent create a structured execution plan before acting. Each step in the plan is checked off as the agent works through it. This improves accuracy on multi-step tasks and makes the agent's progress visible in the UI.
+
+**Sub-Agents** allow the lead agent to delegate subtasks to up to three specialist sub-agents concurrently per turn. Each sub-agent runs in its own sandbox with the full toolset. Use this for complex investigations where parallel work dramatically reduces wall-clock time.
+
+## Choosing the Right Mode
+
+<AccordionGroup>
+  <Accordion title="Quick answer or simple lookup">
+    Use **Flash**. Thinking and planning are off, so you get the fastest possible response with minimal token usage. Ideal for factual questions, quick summaries, or anything that doesn't require multi-step reasoning.
+  </Accordion>
+  <Accordion title="Analysis or technical task">
+    Use **Standard**. Thinking is on, giving the agent extended reasoning before it responds. Good for code review, technical explanations, or any question where accuracy matters more than raw speed.
+  </Accordion>
+  <Accordion title="Research report or structured investigation">
+    Use **Pro**. Thinking and planning are both on, so the agent produces a clear execution plan and works through it methodically. Well-suited for writing research reports, competitive analyses, or any task that benefits from an explicit outline.
+  </Accordion>
+  <Accordion title="Complex investigation or coding project">
+    Use **Ultra**. All three capabilities are active. The lead agent can spin up parallel sub-agents to tackle different parts of the problem simultaneously, then synthesize the results. Best for deep-dive research, large codebase exploration, or any task that would take a human team multiple hours.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  Higher modes consume more LLM tokens and take longer to complete. For interactive workflows where you want fast feedback, start with Flash or Standard and escalate only if the response quality isn't sufficient.
+</Note>

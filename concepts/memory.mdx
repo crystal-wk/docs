@@ -1,0 +1,130 @@
+---
+title: "Long-Term Memory in DeerFlow"
+sidebarTitle: "Memory"
+description: "DeerFlow's memory system persists facts across conversations using pluggable backends. Learn how memory is extracted, stored, and injected into agent context."
+---
+
+DeerFlow's memory system gives the Lead Agent a persistent view of who you are and what you care about — across conversations, not just within a single thread. After each turn, DeerFlow analyzes the exchange for durable facts and preferences, stores them in a memory backend, and automatically injects the most relevant ones into the agent's system prompt on future turns. You don't have to re-explain yourself every time you start a new conversation.
+
+## How Memory Works
+
+Memory operates in a continuous cycle:
+
+<Steps>
+  <Step title="Automatic extraction">
+    After each turn completes, DeerFlow queues the conversation for async memory extraction. An LLM analyzes the exchange and identifies durable facts: your preferences, projects, skills, goals, and context.
+  </Step>
+  <Step title="Validity scoring">
+    The LLM assigns an `expected_valid_days` value to each extracted fact, estimating how long it is likely to remain accurate. Short-lived facts (like "currently working on X today") get low scores; stable facts (like your preferred programming language) get high scores.
+  </Step>
+  <Step title="Storage">
+    Facts are written to the configured memory backend — either the built-in DeerMem file store or an external mem0-compatible API.
+  </Step>
+  <Step title="Context injection">
+    On every subsequent turn, DeerFlow retrieves the top relevant facts from memory and injects them into the Lead Agent's system prompt. The agent uses this context without you needing to provide it explicitly.
+  </Step>
+</Steps>
+
+## Memory Modes
+
+DeerFlow supports two memory modes that control how facts are retrieved and made available to the agent:
+
+| Mode | Description |
+|---|---|
+| `middleware` | Passive extraction after each turn, plus injection of the most-recent `top_k` facts into the system prompt automatically |
+| `tool` | Same passive extraction, but the agent can also actively query memory using the `memory_search` tool for query-aware semantic retrieval |
+
+<Warning>
+If you configure `mode: tool`, the memory backend **must** implement a `search()` method. If it does not, the Gateway will fail to start. DeerMem supports both modes; check your backend's documentation before switching to `tool` mode.
+</Warning>
+
+## Pluggable Backends
+
+### DeerMem (Default)
+
+DeerMem is DeerFlow's built-in memory backend. It requires no external services and stores facts as incremental Markdown in a local JSON file with mtime-based cache invalidation.
+
+- **Storage**: JSON file under the runtime state directory (`.deer-flow/`)
+- **Format**: Structured user context (work, personal, top-of-mind), history, and confidence-scored facts
+- **Debounced updates**: Batches extraction calls to reduce LLM usage
+- **Suitable for**: Single-node deployments, local development, and personal use
+
+### mem0
+
+The mem0 backend delegates all fact extraction, deduplication, and storage to a mem0-compatible API server. Because dedup and storage happen server-side, it is fully stateless in-process and safe for multi-worker Gateway deployments.
+
+<CodeGroup>
+```yaml config.yaml (mem0)
+memory:
+  enabled: true
+  injection_enabled: true
+  manager_class: mem0
+  mode: middleware
+  backend_config:
+    api_key_env: MEM0_API_KEY
+    base_url: https://api.mem0.ai
+    top_k: 8
+    score_threshold: 0.1
+    max_injection_chars: 12000
+    timeout_seconds: 10
+    startup_policy: fail_fast
+    failure_policy:
+      read: fail_open
+      write: log_and_drop
+```
+</CodeGroup>
+
+Set the API key in your environment — never in `config.yaml` directly:
+
+```bash
+export MEM0_API_KEY=your-key-here
+```
+
+**Key configuration options:**
+
+| Field | Description |
+|---|---|
+| `top_k` | How many facts to inject per turn |
+| `score_threshold` | Minimum relevance score for injection (mem0 semantic search) |
+| `max_injection_chars` | Hard cap on injected memory text size |
+| `startup_policy` | `fail_fast` aborts startup if mem0 is unreachable; `tolerate` logs and continues |
+| `failure_policy.read` | `fail_open` continues without memory on read errors; `fail_closed` aborts the run |
+| `failure_policy.write` | `log_and_drop` silently drops failed writes; `raise` propagates the error |
+
+<Note>
+In `mode: middleware`, mem0 recall is query-less — the backend returns the most recent `top_k` memories. For query-aware semantic recall, switch to `mode: tool` so the agent can call `memory_search` with a query string.
+</Note>
+
+## Memory Consolidation
+
+DeerFlow's memory system is self-maintaining:
+
+- **Staleness review**: Facts are periodically reviewed. Facts whose `expected_valid_days` has elapsed are candidates for removal or replacement.
+- **LLM-assigned validity**: Each new fact gets a validity estimate from the extraction LLM, preventing indefinite accumulation of stale data.
+- **Correction guarantees**: When the agent determines that a stored fact is incorrect, correction facts are always injected into the system prompt on the next turn — even if they would otherwise fall below the `top_k` cutoff — to prevent the agent from acting on stale information.
+- **Scope-safe writes**: The extraction middleware stores only durable, descriptive user-level facts. Task-local or session-local summaries are not persisted as long-term memory.
+
+## Viewing and Managing Memory
+
+You have two ways to inspect and manage stored memories:
+
+<Tabs>
+  <Tab title="Web UI">
+    Open **Settings → Memory** in the DeerFlow web interface. You can view all stored facts, see their validity scores, and delete individual entries.
+  </Tab>
+  <Tab title="API">
+    ```bash
+    # Retrieve all memory data for the current user
+    GET /api/memory
+
+    # Force a memory reload from storage
+    POST /api/memory/reload
+
+    # View memory configuration
+    GET /api/memory/config
+
+    # Combined config + data status
+    GET /api/memory/status
+    ```
+  </Tab>
+</Tabs>

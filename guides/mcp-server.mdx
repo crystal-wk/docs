@@ -1,0 +1,261 @@
+---
+title: "Connect MCP Servers to DeerFlow"
+sidebarTitle: "MCP Servers"
+description: "Integrate Model Context Protocol servers with DeerFlow to give agents access to databases, APIs, and custom tools through a unified configuration."
+---
+
+DeerFlow discovers and registers tools from any number of MCP (Model Context Protocol) servers at startup. Once you enable a server in `extensions_config.json`, its tools are immediately available to agents — no code changes, no restarts between tool additions within the same server, and no manual registration required.
+
+## What Is MCP?
+
+MCP servers expose structured tools over a standard protocol. DeerFlow acts as an MCP client: it connects to each enabled server, runs the initialization handshake, and ingests the full tool catalogue. From that point on, every discovered tool is available to the agent exactly like a built-in tool. You can extend DeerFlow with databases, external APIs, browser automation, custom internal services, and more — all through the same configuration file.
+
+## Setup
+
+<Steps>
+  <Step title="Copy the example configuration">
+    Copy the bundled example file to create your local configuration:
+
+    ```shell
+    cp extensions_config.example.json extensions_config.json
+    ```
+  </Step>
+
+  <Step title="Enable desired servers">
+    Open `extensions_config.json` and set `"enabled": true` on each server you want to activate.
+  </Step>
+
+  <Step title="Configure command, arguments, and environment variables">
+    Fill in the `command`, `args`, and `env` fields for each server. Use `$ENV_VAR_NAME` for secrets — DeerFlow expands whole-string environment variable references at load time so credentials never need to be committed.
+  </Step>
+
+  <Step title="Restart the application">
+    Restart DeerFlow to load and register the new MCP tools. You can also reset the MCP tool cache without a full restart by calling `POST /api/mcp/cache/reset`.
+  </Step>
+</Steps>
+
+## Configuration Format
+
+The annotated example below shows a stdio server (GitHub MCP) with both timeout fields set:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "enabled": true,
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "$GITHUB_TOKEN"
+      },
+      "session_init_timeout": 60,
+      "tool_call_timeout": 60
+    }
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `enabled` | Set to `true` to activate the server at startup. |
+| `type` | Transport type: `stdio` or `http`. |
+| `command` | Executable to spawn (stdio) or ignored (http). |
+| `args` | Arguments passed to the subprocess. |
+| `env` | Environment variables forwarded to the subprocess. |
+| `session_init_timeout` | Seconds to wait for subprocess spawn + `initialize` + `tools/list`. Default `60`. |
+| `tool_call_timeout` | Seconds allowed per tool call (stdio only). Default `60`. |
+
+## Server Types
+
+<Tabs>
+  <Tab title="stdio">
+    A stdio server is a subprocess that DeerFlow spawns on startup. DeerFlow communicates with it over stdin/stdout using the MCP wire protocol. This is the most common type for community MCP packages distributed via `npx` or `uvx`.
+
+    ```json
+    {
+      "mcpServers": {
+        "github": {
+          "enabled": true,
+          "type": "stdio",
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-github"],
+          "env": {
+            "GITHUB_TOKEN": "$GITHUB_TOKEN"
+          },
+          "session_init_timeout": 60,
+          "tool_call_timeout": 60
+        }
+      }
+    }
+    ```
+
+    DeerFlow maintains a persistent per-thread session pool for stdio servers to avoid repeated subprocess spawning within a conversation.
+  </Tab>
+
+  <Tab title="HTTP / SSE">
+    An HTTP server is a separately running process that exposes a Streamable HTTP (or SSE) MCP endpoint. DeerFlow connects to it as a client using the URL you provide. Use this type for long-running services, shared infrastructure, or servers that manage their own lifecycle.
+
+    ```json
+    {
+      "mcpServers": {
+        "my-http-server": {
+          "enabled": true,
+          "type": "http",
+          "url": "https://api.example.com/mcp"
+        }
+      }
+    }
+    ```
+
+    <Note>
+      `tool_call_timeout` is ignored for `http` and `sse` servers — those transports use their own connection-level timeouts. DeerFlow logs a warning if you configure it for an HTTP server.
+    </Note>
+  </Tab>
+</Tabs>
+
+## HTTP Server with OAuth
+
+For `http` and `sse` servers that require OAuth 2.0 authentication, add an `oauth` block. DeerFlow handles token acquisition and automatic refresh. Store credentials as environment variables — never hard-code secrets in the config file.
+
+Supported grant types: `client_credentials`, `refresh_token`.
+
+```json
+{
+  "mcpServers": {
+    "secure-http-server": {
+      "enabled": true,
+      "type": "http",
+      "url": "https://api.example.com/mcp",
+      "oauth": {
+        "enabled": true,
+        "token_url": "https://auth.example.com/oauth/token",
+        "grant_type": "client_credentials",
+        "client_id": "$MCP_OAUTH_CLIENT_ID",
+        "client_secret": "$MCP_OAUTH_CLIENT_SECRET",
+        "scope": "mcp.read",
+        "refresh_skew_seconds": 60
+      }
+    }
+  }
+}
+```
+
+## OpenViking MCP
+
+OpenViking's official server exposes a Streamable HTTP MCP endpoint at `/mcp`. Connect to it using the generic `http` transport with your owner-bound USER API key:
+
+```json
+{
+  "mcpServers": {
+    "openviking": {
+      "enabled": true,
+      "type": "http",
+      "url": "http://127.0.0.1:1933/mcp",
+      "headers": {
+        "X-API-Key": "$OPENVIKING_API_KEY"
+      }
+    }
+  }
+}
+```
+
+Set `OPENVIKING_API_KEY` to a normal owner-bound OpenViking **USER API key**. Do not use a root or admin key. If the key is missing or empty at initialization, DeerFlow skips the OpenViking server and no OpenViking tools appear.
+
+<Note>
+  For Docker deployments, point `url` at the address reachable from the Gateway container — for example `http://openviking:1933/mcp` on a shared Compose network, or `http://host.docker.internal:1933/mcp` for a host-installed server.
+</Note>
+
+The native `forget` tool is exposed for capability parity. Because `forget` permanently deletes a `viking://` URI, it should only be called after explicit user confirmation. If you want to block agents from calling it, use DeerFlow's guardrail configuration:
+
+```yaml
+guardrails:
+  enabled: true
+  provider:
+    use: deerflow.guardrails.builtin:AllowlistProvider
+    config:
+      denied_tools: ["openviking_forget"]
+```
+
+## Routing Hints
+
+Use routing hints to guide agents toward a specific MCP server for matching requests. Routing is **soft guidance** — it adds a `<mcp_routing_hints>` section to the model prompt but does not prevent other tools from being used. For hard restrictions, use agent-level allow/deny policy instead.
+
+```json
+{
+  "mcpServers": {
+    "postgres": {
+      "enabled": true,
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/mydb"],
+      "routing": {
+        "mode": "prefer",
+        "priority": 50,
+        "keywords": ["orders", "users", "SQL", "database"]
+      }
+    }
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `mode` | `prefer` emits hints; `off` disables them. |
+| `priority` | `0`–`100`. Higher values are rendered first; also controls auto-promote order when `tool_search` is enabled. |
+| `keywords` | Operator-authored terms that describe when to prefer this server. Use distinctive, specific terms to avoid over-matching. |
+
+You can also set per-tool routing overrides under `tools.<original_tool_name>.routing`. The key is the server's original tool name before any prefix is applied.
+
+## Tool Name Prefixes
+
+By default, DeerFlow prefixes every discovered tool name with `<server_name>_` to prevent collisions when multiple servers expose tools with the same name. For servers that already namespace their own tools, you can opt out:
+
+```json
+{
+  "mcpServers": {
+    "semantic-scholar": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["s2-mcp-server"],
+      "tool_name_prefix": false
+    }
+  }
+}
+```
+
+With `"tool_name_prefix": false`, a tool named `semantic_scholar_search_papers` keeps that name instead of becoming `semantic-scholar_semantic_scholar_search_papers`.
+
+<Warning>
+  Disable the prefix only when every resulting tool name remains unique across all enabled servers. The default is `true` for backward compatibility.
+</Warning>
+
+## Timeouts
+
+Two independent timeouts control stdio MCP server behavior:
+
+| Timeout | Scope | Default | Notes |
+|---|---|---|---|
+| `session_init_timeout` | Subprocess spawn + `initialize` + `tools/list` | `60` seconds | Set to `null` to disable. Prevents a hung server from blocking agent construction. |
+| `tool_call_timeout` | Each individual tool call | `60` seconds | stdio servers only. HTTP/SSE servers use transport-level timeouts. |
+
+## Managing MCP from the Web UI
+
+You can enable, disable, and inspect MCP servers without editing `extensions_config.json` directly. In the DeerFlow web UI, navigate to **Settings → Tools**. Each server can be toggled independently — an invalid stdio command on one server does not block you from toggling another.
+
+<Tip>
+  The web UI updates `extensions_config.json` atomically, so an interrupted save can never leave the file truncated or partially written.
+</Tip>
+
+## Filesystem MCP Servers
+
+<Warning>
+  Do **not** add an MCP filesystem server that points at the DeerFlow workspace. DeerFlow provides built-in file tools for thread-scoped workspace access. Overlapping file tools use different path semantics, which can make LLM tool selection and file access behavior unstable.
+
+  Use DeerFlow's built-in file tools for all DeerFlow workspace files.
+</Warning>
+
+## Learn More
+
+- For the full `extensions_config.json` reference, see the [Configuration Overview](/configuration/overview).
+- For details on the Model Context Protocol itself, visit [modelcontextprotocol.io](https://modelcontextprotocol.io).
